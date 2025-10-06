@@ -1,0 +1,335 @@
+################################################################################
+# Practical 2 — Social Structure in SEIR Models 
+###########################################################
+####proj2 - Group 33 - Extended Statistical Programming ###
+#### Group members as below ################################
+#### Shuo Li (s2795688), Zhe Zhu (s2841606), Antrea Filippou (s2766374)
+#### Contributions as below ################################
+#### Shuo Li: xx (xx%) ###
+#### Zhe Zhu: xx (xx%) ###
+#### Antrea Filippou: xx (xx%) ###
+############################################################
+
+
+################################################################################
+# Practical 2 — Social Structure in SEIR Models (Base R only)
+# ------------------------------------------------------------------------------
+# Team contributions (edit this before submission):
+# - Alice: ~40%  | Bob: ~35%  | Carol: ~25%
+#
+# GitHub repo (make public on submission day):
+# - https://github.com/<org-or-user>/<repo-name>
+#
+# Notes:
+# - All function definitions appear first, as requested.
+# - Code is carefully commented so a reader with base R can follow easily.
+# - No external packages are used.
+################################################################################
+
+# =========================
+# = Step 1: Households   =
+# =========================
+# Creates vector h of household IDs (integers)
+# Sizes are uniformly distributed between 1 and hmax.
+# Robust trimming to exactly n people; no size-0 households.
+
+make_households <- function(n, hmax = 5, seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+  
+  # Oversample sizes in chunks, then trim exactly to n
+  sizes <- integer(0)
+  while (sum(sizes) < n) {
+    sizes <- c(sizes, sample.int(hmax, size = 100, replace = TRUE))
+  }
+  cs <- cumsum(sizes)
+  last <- which(cs >= n)[1]
+  sizes <- sizes[1:last]
+  # Reduce the final household so that total count is exactly n
+  sizes[last] <- sizes[last] - (cs[last] - n)  # remains >= 1
+  
+  # Build household membership vector and randomize assignment of people
+  h <- rep.int(seq_along(sizes), times = sizes)
+  h <- sample(h, length(h), replace = FALSE)
+  return(h)
+}
+
+# ============================================
+# = Step 2: Build non-household contact net  =
+# ============================================
+# Signature aligned with brief: get.net(beta, nc = 15)
+# Optional 'h' allows exclusion of within-household links when provided.
+# Returns a list 'alink' where alink[[i]] are regular (non-HH) contacts of i.
+# Undirected, no duplicate links.
+
+get.net <- function(beta, nc = 15, h = NULL) {
+  n    <- length(beta)
+  bbar <- mean(beta)
+  if (n < 2L) return(vector("list", n))
+  # Edge probability p_ij = nc * beta_i * beta_j / (bbar^2 * (n - 1))
+  cst  <- nc / (bbar^2 * (n - 1))
+  alink <- vector("list", n)
+  
+  # Precompute HH membership indices if h provided
+  HH <- NULL
+  if (!is.null(h)) {
+    H_ids <- unique(h)
+    HH <- vector("list", length(H_ids))
+    names(HH) <- as.character(H_ids)
+    for (hid in H_ids) {
+      HH[[as.character(hid)]] <- which(h == hid)
+    }
+  }
+  
+  # Attempt each unordered pair once (i<j); add edges symmetrically
+  for (i in 1:(n - 1)) {
+    js <- (i + 1):n
+    if (!is.null(HH)) {
+      hid <- h[i]
+      hh_members <- HH[[as.character(hid)]]
+      if (length(hh_members)) js <- setdiff(js, hh_members)
+    }
+    if (length(js) == 0) next
+    p <- cst * beta[i] * beta[js]
+    # Guard against tiny numerical overshoots
+    p[p < 0] <- 0; p[p > 1] <- 1
+    u <- runif(length(js))
+    keep <- which(u < p)
+    if (length(keep)) {
+      nbrs <- js[keep]
+      alink[[i]] <- c(alink[[i]], nbrs)
+      for (j in nbrs) {
+        alink[[j]] <- c(alink[[j]], i)
+      }
+    }
+  }
+  # Deduplicate and sort neighbor lists
+  for (i in seq_len(n)) {
+    if (length(alink[[i]]) > 1) alink[[i]] <- sort(unique(alink[[i]]))
+  }
+  return(alink)
+}
+
+# ============================================================
+# = Step 3: SEIR simulator with households & contact network =
+# ============================================================
+# Implements:
+# - E->I with daily probability gamma, I->R with daily probability delta.
+# - S->E via three independent channels (household, contact network, random mix).
+# Independence => multiply "no-infection" probabilities from each channel.
+# Random mixing uses the standard small-p exponential approximation:
+#   prod_i (1 - c_mix * beta_S * beta_i)  ≈  exp(- c_mix * beta_S * sum(beta_I))
+# (Exact version is provided below commented; slower for large n.)
+
+nseir <- function(beta, h, alink,
+                  alpha = c(0.1, 0.01, 0.01), # c(alpha_h, alpha_c, alpha_r)
+                  delta = 0.2,
+                  gamma = 0.4,
+                  nc    = 15,
+                  nt    = 100,
+                  pinf  = 0.005) {
+  n     <- length(beta)
+  stopifnot(length(h) == n, length(alink) == n)
+  
+  bbar  <- mean(beta)
+  tvec  <- seq_len(nt)
+  S_CODE <- 1L; E_CODE <- 2L; I_CODE <- 3L; R_CODE <- 4L
+  
+  # Initial states
+  state <- rep.int(S_CODE, n)
+  nI0   <- max(1L, round(pinf * n))
+  initI <- sample.int(n, size = nI0, replace = FALSE)
+  state[initI] <- I_CODE
+  
+  # Household membership index lists
+  H_ids <- unique(h)
+  HH <- vector("list", length(H_ids))
+  names(HH) <- as.character(H_ids)
+  for (hid in H_ids) HH[[as.character(hid)]] <- which(h == hid)
+  
+  # Output time series
+  S_daily <- integer(nt)
+  E_daily <- integer(nt)
+  I_daily <- integer(nt)
+  R_daily <- integer(nt)
+  
+  # Random mixing constant (shares nc with network, per brief)
+  c_mix <- alpha[3] * nc / (bbar^2 * (n - 1))
+  
+  for (tt in tvec) {
+    indS <- which(state == S_CODE)
+    indE <- which(state == E_CODE)
+    indI <- which(state == I_CODE)
+    indR <- which(state == R_CODE)
+    
+    # Record totals
+    S_daily[tt] <- length(indS)
+    E_daily[tt] <- length(indE)
+    I_daily[tt] <- length(indI)
+    R_daily[tt] <- length(indR)
+    
+    # E -> I
+    if (length(indE)) {
+      uEI <- runif(length(indE))
+      toI <- indE[uEI < gamma]
+      if (length(toI)) state[toI] <- I_CODE
+    }
+    
+    # I -> R
+    indI <- which(state == I_CODE)
+    if (length(indI)) {
+      uIR <- runif(length(indI))
+      toR <- indI[uIR < delta]
+      if (length(toR)) state[toR] <- R_CODE
+    }
+    
+    # New infections S -> E (if both S and I exist)
+    indS <- which(state == S_CODE)
+    indI <- which(state == I_CODE)
+    if (length(indS) && length(indI)) {
+      # Household exposures: for each S, count Infectious in same HH
+      I_by_hh <- integer(length(H_ids)); names(I_by_hh) <- as.character(H_ids)
+      I_tab <- table(h[indI])
+      if (length(I_tab)) I_by_hh[names(I_tab)] <- as.integer(I_tab)
+      H_I_per_S <- I_by_hh[as.character(h[indS])]
+      Pnh <- (1 - alpha[1])^H_I_per_S
+      
+      # Contact-network exposures: for each S, count Infectious neighbors
+      I_flag <- logical(n); I_flag[indI] <- TRUE
+      C_I_per_S <- integer(length(indS))
+      for (k in seq_along(indS)) {
+        j <- indS[k]
+        nbrs <- alink[[j]]
+        if (length(nbrs)) C_I_per_S[k] <- sum(I_flag[nbrs])
+      }
+      Pnc <- (1 - alpha[2])^C_I_per_S
+      
+      # Random mixing exposures: exponential approximation (fast)
+      sum_beta_I <- sum(beta[indI])
+      Pnr <- exp(- c_mix * beta[indS] * sum_beta_I)
+      
+      # --- Exact (slower) version for reference ---
+      # Pnr <- exp(colSums(log1p(- c_mix * outer(beta[indS], beta[indI]))))
+      
+      # Combine independent channels
+      P_not_infected <- Pnh * Pnc * Pnr
+      P_infected     <- 1 - P_not_infected
+      
+      # Apply infections
+      uSE <- runif(length(indS))
+      toE <- indS[uSE < P_infected]
+      if (length(toE)) state[toE] <- E_CODE
+    }
+  }
+  
+  out <- list(S = S_daily, E = E_daily, I = I_daily, R = R_daily, t = tvec)
+  return(out)
+}
+
+# =======================================
+# = Step 4: Plotting of SEIR trajectories
+# =======================================
+
+plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
+  stopifnot(all(c("S","E","I","R","t") %in% names(sim)))
+  mat <- cbind(S = sim$S, E = sim$E, I = sim$I, R = sim$R)
+  op <- par(mar = c(4.2, 4.5, 3.5, 1.2))
+  on.exit(par(op))
+  matplot(sim$t, mat, type = "l", lwd = 2,
+          xlab = "Day", ylab = "Population count", main = main,
+          lty = 1) # make legend lty consistent
+  legend("right", inset = 0.01, lwd = 2, col = 1:4, lty = 1,
+         legend = c("S","E","I","R"), bg = "white", cex = 0.9)
+}
+
+# =========================================================
+# = Step 5: Compare 4 scenarios & side-by-side plotting   =
+# =========================================================
+# Scenarios:
+# A) Full model, beta ~ U(0,1)
+# B) Random mixing only (alpha_h = alpha_c = 0, alpha_r = 0.04)
+# C) Full model, constant beta = mean(beta)
+# D) Random mixing + constant beta
+# For fair comparison, we use one RNG seed at the start, but do not
+# re-seed inside each simulation to avoid accidental identical draws.
+
+run_four_scenarios <- function(n = 1000, nt = 150, hmax = 5, nc = 15,
+                               alpha_full = c(0.1, 0.01, 0.01),
+                               alpha_random_only = c(0, 0, 0.04),
+                               delta = 0.2, gamma = 0.4, pinf = 0.005,
+                               seed = 1) {
+  if (!is.null(seed)) set.seed(seed)
+  
+  betaA <- runif(n, 0, 1)
+  h     <- make_households(n, hmax = hmax)  # uses current RNG stream
+  alink <- get.net(betaA, nc = nc, h = h)
+  
+  simA <- nseir(betaA, h, alink,
+                alpha = alpha_full, delta = delta, gamma = gamma,
+                nc = nc, nt = nt, pinf = pinf)
+  
+  simB <- nseir(betaA, h, alink,
+                alpha = alpha_random_only, delta = delta, gamma = gamma,
+                nc = nc, nt = nt, pinf = pinf)
+  
+  betaC <- rep(mean(betaA), n)
+  alinkC <- get.net(betaC, nc = nc, h = h)
+  
+  simC <- nseir(betaC, h, alinkC,
+                alpha = alpha_full, delta = delta, gamma = gamma,
+                nc = nc, nt = nt, pinf = pinf)
+  
+  simD <- nseir(betaC, h, alinkC,
+                alpha = alpha_random_only, delta = delta, gamma = gamma,
+                nc = nc, nt = nt, pinf = pinf)
+  
+  # Helper to compose a compact title with peak I and final R
+  mk_title <- function(lbl, sim) {
+    peakI <- max(sim$I)
+    finR  <- tail(sim$R, 1)
+    paste0(lbl, "\npeak I = ", peakI, ", final R = ", finR)
+  }
+  
+  op <- par(mfrow = c(2, 2), mar = c(4.2, 4.5, 3.5, 1.2))
+  on.exit(par(op), add = TRUE)
+  plot_nseir(simA, main = mk_title("A) Full model, beta ~ U(0,1)", simA))
+  plot_nseir(simB, main = mk_title("B) Random mixing only (αh=αc=0, αr=0.04)", simB))
+  plot_nseir(simC, main = mk_title("C) Full model, constant beta = mean(beta)", simC))
+  plot_nseir(simD, main = mk_title("D) Random mixing + constant beta", simD))
+  
+  invisible(list(A = simA, B = simB, C = simC, D = simD,
+                 betaA = betaA, betaC = betaC, h = h,
+                 alinkA = alink, alinkC = alinkC))
+}
+
+################################################################################
+#                          — End of function definitions —                     #
+################################################################################
+
+# ===========================
+# Example: run the scenarios
+# ===========================
+# (Reproducible with a single seed at the start; no reseeding inside.)
+
+set.seed(42)
+res <- run_four_scenarios(
+  n = 1000,
+  nt = 150,
+  hmax = 5,
+  nc = 15,
+  alpha_full = c(0.1, 0.01, 0.01),
+  alpha_random_only = c(0, 0, 0.04),
+  delta = 0.2,
+  gamma = 0.4,
+  pinf = 0.005,
+  seed = NULL  # already seeded above; leave NULL to avoid resetting inside
+)
+
+# ---------------------------
+# Brief commentary (Step 5):
+# ---------------------------
+#  runs, scenarios with structured mixing (A, C) produce
+# - slightly later and/or lower peaks than pure random mixing (B, D),
+# - smaller final size when heterogeneity in beta is present (A vs C),
+# consistent with the notes: variability and clustering suppress spread.
+# Random mixing with elevated αr (B, D) tends to raise peak I and final R.
+
