@@ -13,6 +13,7 @@ make_households <- function(n, hmax = 5, seed = NULL) {
   while (sum(sizes) < n) { ## keep sampling until total population >= n
     sizes <- c(sizes, sample.int(hmax, size = 100, replace = TRUE))  ## sample 100 household sizes at a time
   }
+  
   cs <- cumsum(sizes)  ## cumulative sum of household sizes
   last <- which(cs >= n)[1] ## index of last household needed to reach n
   sizes <- sizes[1:last]  ## keep only necessary households
