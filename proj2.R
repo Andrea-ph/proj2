@@ -1,13 +1,15 @@
 ## proj2
 make_households <- function(n, hmax = 5, seed = NULL) {
-## create a vector h of household IDs (integers)
-## household sizes are uniformly sampled between 1 and hmax
+## Generate a vector h of household IDs (integers) of length n.
+## Household sizes are uniformly distributed between 1 and hmax.
 ## trimming ensures exactly n people; no size-0 households
 ## the final vector is shuffled to randomize assignments
+## Returns integer vector h where same number indicates same household.
 
   if (!is.null(seed)) set.seed(seed) ## set RNG seed if provided
 
   sizes <- integer(0) ## initialize vector to store household sizes
+  
   while (sum(sizes) < n) { ## keep sampling until total population >= n
     sizes <- c(sizes, sample.int(hmax, size = 100, replace = TRUE))  ## sample 100 household sizes at a time
   }
