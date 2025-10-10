@@ -1,5 +1,4 @@
-## proj2
-make_households <- function(n, hmax = 5, seed = NULL, shuffle = TRUE, return_sizes = FALSE) {
+make_households <- function(n, hmax, seed = NULL, shuffle = TRUE, return_sizes) {
   ## Generate a vector h of household IDs (integers) of length n.
   ## Household sizes are uniformly distributed between 1 and hmax.
   ## Includes safety checks and dynamic batch sampling for efficiency.
@@ -8,7 +7,7 @@ make_households <- function(n, hmax = 5, seed = NULL, shuffle = TRUE, return_siz
   
   ## If seed is provided, set RNG seed for reproducibility
   if (!is.null(seed)) set.seed(seed)
-
+  
   ## Convert to integer explicitly
   n <- as.integer(n)
   hmax <- as.integer(hmax)
@@ -54,10 +53,16 @@ make_households <- function(n, hmax = 5, seed = NULL, shuffle = TRUE, return_siz
   ## --- Return ---
   ## Optionally return both household vector and size summary
   if (isTRUE(return_sizes)) {
-    return(list(h = h, sizes = as.integer(table(h))))
+    result <- list(h = h, sizes = as.integer(table(h)))
   } else {
-    return(h)
+    result <- h
   }
+  
+  ## Print output for verification
+  print(result)
+  
+  ## Return invisibly (so print happens only once)
+  invisible(result)
 }
 
-
+make_households(n = 1000, hmax = 5, seed = 123, return_sizes = TRUE)
