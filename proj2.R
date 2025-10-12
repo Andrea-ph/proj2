@@ -66,3 +66,62 @@ make_households <- function(n, hmax, seed = NULL, shuffle = TRUE, return_sizes) 
 }
 
 make_households(n = 1000, hmax = 5, seed = 123, return_sizes = TRUE)
+
+# = Step 2: Build non-household contact network =
+# ===============================================
+# Function: get.net(beta, nc = 15, h = NULL)
+# Builds a symmetric network of regular (non-household) contacts.
+# If household vector h is provided, excludes within-household links.
+# Returns a list 'alink' where alink[[i]] are contacts of person i.
+
+get.net <- function(beta, nc = 15, h = NULL) {
+
+  n    <- length(beta)                      ## total number of individuals
+  bbar <- mean(beta)                        ## mean of contact propensity (beta)
+  if (n < 2L) return(vector("list", n))     ## no edges possible if fewer than 2 people
+
+  cst  <- nc / (bbar^2 * (n - 1))           ## constant ensuring expected degree = nc
+  alink <- vector("list", n)                ## initialize empty list for adjacency info
+
+  HH <- NULL                                ## initialize household membership index
+  if (!is.null(h)) {                        ## only build household index if h is provided
+    H_ids <- unique(h)                      ## get all unique household IDs
+    HH <- vector("list", length(H_ids))     ## create list to hold members of each household
+    names(HH) <- as.character(H_ids)        ## name each list element by its household ID
+    for (hid in H_ids) {                    ## loop over each household
+      HH[[as.character(hid)]] <- which(h == hid)  ## store member indices of this household
+    }
+  }
+
+  for (i in 1:(n - 1)) {                    ## loop over all individuals except last
+    js <- (i + 1):n                         ## potential partners are those after i (avoid duplicates)
+    if (!is.null(HH)) {                     ## if household info exists
+      hid <- h[i]                           ## get household ID of person i
+      hh_members <- HH[[as.character(hid)]] ## get all members in i’s household
+      if (length(hh_members))               ## if household not empty
+        js <- setdiff(js, hh_members)       ## remove household members from potential partners
+    }
+    if (length(js) == 0) next               ## skip if no eligible partners left
+
+    p <- cst * beta[i] * beta[js]           ## edge probability for each (i,j) pair
+    p[p < 0] <- 0; p[p > 1] <- 1            ## ensure probabilities remain in [0,1]
+
+    u <- runif(length(js))                  ## draw uniform random numbers for each potential link
+    keep <- which(u < p)                    ## select links where random number < probability
+
+    if (length(keep)) {                     ## if any links are formed
+      nbrs <- js[keep]                      ## get indices of connected individuals
+      alink[[i]] <- c(alink[[i]], nbrs)     ## add neighbors to i’s adjacency list
+      for (j in nbrs) {                     ## for each neighbor j
+        alink[[j]] <- c(alink[[j]], i)      ## add i to j’s adjacency list (symmetry)
+      }
+    }
+  }
+
+  for (i in seq_len(n)) {                   ## clean adjacency list for each person
+    if (length(alink[[i]]) > 1)             ## only if person has more than one neighbor
+      alink[[i]] <- sort(unique(alink[[i]]))## remove duplicates and sort for consistency
+  }
+
+  return(alink)                             ## return final list of contact links
+}
