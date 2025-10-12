@@ -125,3 +125,226 @@ get.net <- function(beta, nc = 15, h = NULL) {
 
   return(alink)                             ## return final list of contact links
 }
+
+# = Step 3: SEIR simulator with households & contact network =
+# ============================================================
+# Implements:
+# - E->I with daily probability gamma, I->R with daily probability delta.
+# - S->E via three independent channels (household, contact network, random mix).
+# Independence => multiply "no-infection" probabilities from each channel.
+# Random mixing uses the standard small-p exponential approximation:
+#   prod_i (1 - c_mix * beta_S * beta_i)  ≈  exp(- c_mix * beta_S * sum(beta_I))
+# (Exact version is provided below commented; slower for large n.)
+
+nseir <- function(beta, h, alink,
+                  alpha = c(0.1, 0.01, 0.01), # c(alpha_h, alpha_c, alpha_r)
+                  delta = 0.2,
+                  gamma = 0.4,
+                  nc    = 15,
+                  nt    = 100,
+                  pinf  = 0.005) {
+  n     <- length(beta)
+  stopifnot(length(h) == n, length(alink) == n)
+  
+  bbar  <- mean(beta)
+  tvec  <- seq_len(nt)
+  S_CODE <- 1L; E_CODE <- 2L; I_CODE <- 3L; R_CODE <- 4L
+  
+  # Initial states
+  state <- rep.int(S_CODE, n)
+  nI0   <- max(1L, round(pinf * n))
+  initI <- sample.int(n, size = nI0, replace = FALSE)
+  state[initI] <- I_CODE
+  
+  # Household membership index lists
+  H_ids <- unique(h)
+  HH <- vector("list", length(H_ids))
+  names(HH) <- as.character(H_ids)
+  for (hid in H_ids) HH[[as.character(hid)]] <- which(h == hid)
+  
+  # Output time series
+  S_daily <- integer(nt)
+  E_daily <- integer(nt)
+  I_daily <- integer(nt)
+  R_daily <- integer(nt)
+  
+  # Random mixing constant (shares nc with network, per brief)
+  c_mix <- alpha[3] * nc / (bbar^2 * (n - 1))
+  
+  for (tt in tvec) {
+    indS <- which(state == S_CODE)
+    indE <- which(state == E_CODE)
+    indI <- which(state == I_CODE)
+    indR <- which(state == R_CODE)
+    
+    # Record totals
+    S_daily[tt] <- length(indS)
+    E_daily[tt] <- length(indE)
+    I_daily[tt] <- length(indI)
+    R_daily[tt] <- length(indR)
+    
+    # E -> I
+    if (length(indE)) {
+      uEI <- runif(length(indE))
+      toI <- indE[uEI < gamma]
+      if (length(toI)) state[toI] <- I_CODE
+    }
+    
+    # I -> R
+    indI <- which(state == I_CODE)
+    if (length(indI)) {
+      uIR <- runif(length(indI))
+      toR <- indI[uIR < delta]
+      if (length(toR)) state[toR] <- R_CODE
+    }
+    
+    # New infections S -> E (if both S and I exist)
+    indS <- which(state == S_CODE)
+    indI <- which(state == I_CODE)
+    if (length(indS) && length(indI)) {
+      # Household exposures: for each S, count Infectious in same HH
+      I_by_hh <- integer(length(H_ids)); names(I_by_hh) <- as.character(H_ids)
+      I_tab <- table(h[indI])
+      if (length(I_tab)) I_by_hh[names(I_tab)] <- as.integer(I_tab)
+      H_I_per_S <- I_by_hh[as.character(h[indS])]
+      Pnh <- (1 - alpha[1])^H_I_per_S
+      
+      # Contact-network exposures: for each S, count Infectious neighbors
+      I_flag <- logical(n); I_flag[indI] <- TRUE
+      C_I_per_S <- integer(length(indS))
+      for (k in seq_along(indS)) {
+        j <- indS[k]
+        nbrs <- alink[[j]]
+        if (length(nbrs)) C_I_per_S[k] <- sum(I_flag[nbrs])
+      }
+      Pnc <- (1 - alpha[2])^C_I_per_S
+      
+      # Random mixing exposures: exponential approximation (fast)
+      sum_beta_I <- sum(beta[indI])
+      Pnr <- exp(- c_mix * beta[indS] * sum_beta_I)
+      
+      # --- Exact (slower) version for reference ---
+      # Pnr <- exp(colSums(log1p(- c_mix * outer(beta[indS], beta[indI]))))
+      
+      # Combine independent channels
+      P_not_infected <- Pnh * Pnc * Pnr
+      P_infected     <- 1 - P_not_infected
+      
+      # Apply infections
+      uSE <- runif(length(indS))
+      toE <- indS[uSE < P_infected]
+      if (length(toE)) state[toE] <- E_CODE
+    }
+  }
+  
+  out <- list(S = S_daily, E = E_daily, I = I_daily, R = R_daily, t = tvec)
+  return(out)
+}
+
+# =======================================
+# = Step 4: Plotting of SEIR trajectories
+# =======================================
+
+plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
+  stopifnot(all(c("S","E","I","R","t") %in% names(sim)))
+  mat <- cbind(S = sim$S, E = sim$E, I = sim$I, R = sim$R)
+  op <- par(mar = c(4.2, 4.5, 3.5, 1.2))
+  on.exit(par(op))
+  matplot(sim$t, mat, type = "l", lwd = 2,
+          xlab = "Day", ylab = "Population count", main = main,
+          lty = 1) # make legend lty consistent
+  legend("right", inset = 0.01, lwd = 2, col = 1:4, lty = 1,
+         legend = c("S","E","I","R"), bg = "white", cex = 0.9)
+}
+
+# =========================================================
+# = Step 5: Compare 4 scenarios & side-by-side plotting   =
+# =========================================================
+# Scenarios:
+# A) Full model, beta ~ U(0,1)
+# B) Random mixing only (alpha_h = alpha_c = 0, alpha_r = 0.04)
+# C) Full model, constant beta = mean(beta)
+# D) Random mixing + constant beta
+# For fair comparison, we use one RNG seed at the start, but do not
+# re-seed inside each simulation to avoid accidental identical draws.
+
+run_four_scenarios <- function(n = 1000, nt = 150, hmax = 5, nc = 15,
+                               alpha_full = c(0.1, 0.01, 0.01),
+                               alpha_random_only = c(0, 0, 0.04),
+                               delta = 0.2, gamma = 0.4, pinf = 0.005,
+                               seed = 1) {
+  if (!is.null(seed)) set.seed(seed)
+  
+  betaA <- runif(n, 0, 1)
+  h     <- make_households(n, hmax = hmax)  # uses current RNG stream
+  alink <- get.net(betaA, nc = nc, h = h)
+  
+  simA <- nseir(betaA, h, alink,
+                alpha = alpha_full, delta = delta, gamma = gamma,
+                nc = nc, nt = nt, pinf = pinf)
+  
+  simB <- nseir(betaA, h, alink,
+                alpha = alpha_random_only, delta = delta, gamma = gamma,
+                nc = nc, nt = nt, pinf = pinf)
+  
+  betaC <- rep(mean(betaA), n)
+  alinkC <- get.net(betaC, nc = nc, h = h)
+  
+  simC <- nseir(betaC, h, alinkC,
+                alpha = alpha_full, delta = delta, gamma = gamma,
+                nc = nc, nt = nt, pinf = pinf)
+  
+  simD <- nseir(betaC, h, alinkC,
+                alpha = alpha_random_only, delta = delta, gamma = gamma,
+                nc = nc, nt = nt, pinf = pinf)
+  
+  # Helper to compose a compact title with peak I and final R
+  mk_title <- function(lbl, sim) {
+    peakI <- max(sim$I)
+    finR  <- tail(sim$R, 1)
+    paste0(lbl, "\npeak I = ", peakI, ", final R = ", finR)
+  }
+  
+  op <- par(mfrow = c(2, 2), mar = c(4.2, 4.5, 3.5, 1.2))
+  on.exit(par(op), add = TRUE)
+  plot_nseir(simA, main = mk_title("A) Full model, beta ~ U(0,1)", simA))
+  plot_nseir(simB, main = mk_title("B) Random mixing only (αh=αc=0, αr=0.04)", simB))
+  plot_nseir(simC, main = mk_title("C) Full model, constant beta = mean(beta)", simC))
+  plot_nseir(simD, main = mk_title("D) Random mixing + constant beta", simD))
+  
+  invisible(list(A = simA, B = simB, C = simC, D = simD,
+                 betaA = betaA, betaC = betaC, h = h,
+                 alinkA = alink, alinkC = alinkC))
+}
+
+################################################################################
+#                          — End of function definitions —                     #
+################################################################################
+
+# ===========================
+# Example: run the scenarios
+# ===========================
+# (Reproducible with a single seed at the start; no reseeding inside.)
+
+set.seed(42)
+res <- run_four_scenarios(
+  n = 1000,
+  nt = 150,
+  hmax = 5,
+  nc = 15,
+  alpha_full = c(0.1, 0.01, 0.01),
+  alpha_random_only = c(0, 0, 0.04),
+  delta = 0.2,
+  gamma = 0.4,
+  pinf = 0.005,
+  seed = NULL  # already seeded above; leave NULL to avoid resetting inside
+)
+
+# ---------------------------
+# Brief commentary (Step 5):
+# ---------------------------
+#  runs, scenarios with structured mixing (A, C) produce
+# - slightly later and/or lower peaks than pure random mixing (B, D),
+# - smaller final size when heterogeneity in beta is present (A vs C),
+# consistent with the notes: variability and clustering suppress spread.
+# Random mixing with elevated αr (B, D) tends to raise peak I and final R.
