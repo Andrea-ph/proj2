@@ -1,4 +1,4 @@
-make_households <- function(n, hmax, seed = NULL, shuffle = TRUE, return_sizes) {
+make_households <- function(n, hmax, seed = NULL, shuffle = TRUE, return_sizes = FALSE) {
   ## Generate a vector h of household IDs (integers) of length n.
   ## Household sizes are uniformly distributed between 1 and hmax.
   ## Includes safety checks and dynamic batch sampling for efficiency.
