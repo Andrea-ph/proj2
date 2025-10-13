@@ -81,6 +81,8 @@ make_households <- function(n, hmax, seed = NULL, shuffle = TRUE, return_sizes =
 # ===============================================
 # Function: get.net(beta, nc = 15, h = NULL)
 # Builds a symmetric network of regular (non-household) contacts.
+# beta is the n vector of βi value for each person
+# nc is the average number of contacts per person
 # If household vector h is provided, excludes within-household links.
 # Returns a list 'alink' where alink[[i]] are contacts of person i.
 
