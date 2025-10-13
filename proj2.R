@@ -1,6 +1,15 @@
-###########################################################
+################################################################################
 # Practical 2 — Social Structure in SEIR Models 
 ###########################################################
+####proj2 - Group 33 - Extended Statistical Programming ###
+#### Group members as below ################################
+#### Shuo Li (s2795688), Zhe Zhu (s2841606), Antrea Filippou (s2766374)
+#### Contributions as below ################################
+#### Shuo Li: xx (xx%) ###
+#### Zhe Zhu: xx (xx%) ###
+#### Antrea Filippou: xx (xx%) ###
+############################################################
+
 #=========================================================
 # Generate household membership vector h
 #=========================================================
@@ -154,7 +163,7 @@ nseir <- function(beta, h, alink,                   # SEIR simulation function
 }
 
 
-# = Step 4: Plotting of SEIR trajectories
+# Plotting of SEIR trajectories
 # =======================================
 
 plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
@@ -170,9 +179,9 @@ plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
 }
 
 
-# =========================================================
-# = Step 5: Compare 4 scenarios & side-by-side plotting =
-# =========================================================
+# ===============================================
+# = Compare 4 scenarios & side-by-side plotting =
+# ===============================================
 # Scenarios:
 # A) Full model, beta ~ U(0,1)
 # B) Random mixing only (alpha_h = alpha_c = 0, alpha_r = 0.04)
@@ -229,10 +238,6 @@ run_four_scenarios <- function(n = 1000, nt = 150, hmax = 5, nc = 15,
                  alinkA = alink, alinkC = alinkC))
 }
 
-################################################################################
-#                          — End of function definitions —                     #
-################################################################################
-
 # ===========================
 # Example: run the scenarios
 # ===========================
@@ -253,7 +258,7 @@ res <- run_four_scenarios(
 )
 
 # ---------------------------
-# Brief commentary (Step 5):
+# Brief commentary:
 # ---------------------------
 #  runs, scenarios with structured mixing (A, C) produce
 # - slightly later and/or lower peaks than pure random mixing (B, D),
