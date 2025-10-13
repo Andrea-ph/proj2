@@ -78,9 +78,6 @@ make_households <- function(n, hmax, seed = NULL, shuffle = TRUE, return_sizes =
   invisible(result)
 }
 
-make_households(n = 1000, hmax = 5, seed = 123, return_sizes = TRUE)
-
-
 # ===============================================
 # Function: get.net(beta, nc = 15, h = NULL)
 # Builds a symmetric network of regular (non-household) contacts.
