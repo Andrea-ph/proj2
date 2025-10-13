@@ -53,6 +53,8 @@ make_households <- function(n, hmax = 5, seed = NULL) {
   return(h)
 }
 
+#####Changes:1)i changed code on step one to be in line coded as said on the brief.2)I have put a verification step 
+
 # ============================================
 # = Step 2: Build non-household contact net  =
 # ============================================
