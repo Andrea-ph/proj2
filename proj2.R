@@ -1,4 +1,4 @@
-################################################################################
+##########################################################
 # Practical 2 — Social Structure in SEIR Models 
 ###########################################################
 ####proj2 - Group 33 - Extended Statistical Programming ###
@@ -13,55 +13,55 @@
 #=========================================================
 # Generate household membership vector h
 #=========================================================
-h <- rep(                                          # repeat household IDs
-  seq_along(household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)),  # sample household sizes
-  household_sizes                                  # repeat IDs according to household size
-)[1:n]                                             # trim vector to length n
+h <- rep(  ## repeat household IDs
+  seq_along(household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)),  ## sample household sizes
+  household_sizes  ## repeat IDs according to household size
+)[1:n]  ## trim vector to length n
 
-#=========================================================
+#=======================================
 # Function to build contact network
-#=========================================================
-get.net <- function(beta, h, nc = 15) {           # function to generate contact network
-  n <- length(beta)                                # total number of individuals
-  if (n < 2L) return(vector("list", n))           # return empty list if less than 2 people
-  bbar <- mean(beta)                               # mean infectivity
-  cst <- nc / (bbar^2 * (n - 1))                  # constant to match expected degree
-  alink <- vector("list", n)                       # initialize adjacency list
+#=======================================
+get.net <- function(beta, h, nc = 15) {  ## function to generate contact network
+  n <- length(beta)  ## total number of individuals
+  if (n < 2L) return(vector("list", n))  ## return empty list if less than 2 people
+  bbar <- mean(beta)  ## mean infectivity
+  cst <- nc / (bbar^2 * (n - 1))  ## constant to match expected degree
+  alink <- vector("list", n)  ## initialize adjacency list
   
-  H_ids <- unique(h)                               # unique household IDs
-  HH <- vector("list", length(H_ids))             # list to hold household members
-  names(HH) <- as.character(H_ids)                # name each list element by household ID
-  for (hid in H_ids) {                             # loop over each household
-    HH[[as.character(hid)]] <- which(h == hid)    # store indices of household members
+  H_ids <- unique(h)  ## unique household IDs
+  HH <- vector("list", length(H_ids))  ## list to hold household members
+  names(HH) <- as.character(H_ids)  ## name each list element by household ID
+  for (hid in H_ids) {   ## loop over each household
+    HH[[as.character(hid)]] <- which(h == hid)  ## store indices of household members
   }
   
-  for (i in 1:(n - 1)) {                           # loop over individuals except last
-    js <- (i + 1):n                                # potential partners to avoid duplicates
-    hid <- h[i]                                    # get household ID of i
-    hh_members <- HH[[as.character(hid)]]         # get members of i's household
-    js <- setdiff(js, hh_members)                  # remove household members from partners
-    if (length(js) == 0) next                      # skip if no partners left
+  for (i in 1:(n - 1)) {  ## loop over individuals except last
+    js <- (i + 1):n   ## potential partners to avoid duplicates
+    hid <- h[i]  ## get household ID of i
+    hh_members <- HH[[as.character(hid)]]  ## get members of i's household
+    js <- setdiff(js, hh_members)  ## remove household members from partners
+    if (length(js) == 0) next  ## skip if no partners left
     
-    p <- cst * beta[i] * beta[js]                  # compute edge probabilities
-    p[p < 0] <- 0                                  # ensure probabilities >= 0
-    p[p > 1] <- 1                                  # ensure probabilities <= 1
+    p <- cst * beta[i] * beta[js] ## compute edge probabilities
+    p[p < 0] <- 0  ## ensure probabilities >= 0
+    p[p > 1] <- 1  ## ensure probabilities <= 1
     
-    u <- runif(length(js))                          # draw uniform random numbers
-    keep <- which(u < p)                            # keep edges where u < probability
+    u <- runif(length(js))  ## draw uniform random numbers
+    keep <- which(u < p)  ## keep edges where u < probability
     
-    if (length(keep)) {                             # if any edges are kept
-      nbrs <- js[keep]                              # get connected partners
-      alink[[i]] <- c(alink[[i]], nbrs)            # add neighbors to i's adjacency list
-      for (j in nbrs) alink[[j]] <- c(alink[[j]], i) # add i to each neighbor's adjacency list
+    if (length(keep)) {  ## if any edges are kept
+      nbrs <- js[keep]   ## get connected partners
+      alink[[i]] <- c(alink[[i]], nbrs)  ## add neighbors to i's adjacency list
+      for (j in nbrs) alink[[j]] <- c(alink[[j]], i) ## add i to each neighbor's adjacency list
     }
   }
   
-  for (i in seq_len(n)) {                           # loop to clean adjacency list
-    if (length(alink[[i]]) > 1)                     # only if person has multiple neighbors
-      alink[[i]] <- sort(unique(alink[[i]]))        # remove duplicates and sort
+  for (i in seq_len(n)) {  ## loop to clean adjacency list
+    if (length(alink[[i]]) > 1)  ## only if person has multiple neighbors
+      alink[[i]] <- sort(unique(alink[[i]]))  ## remove duplicates and sort
   }
   
-  return(alink)                                     # return final adjacency list
+  return(alink) ## return final adjacency list
 }
 
 #=========================================================
