@@ -13,6 +13,8 @@
 #=========================================================
 # Generate household membership vector h
 #=========================================================
+hmax<-5
+n<-1000
 h <- rep(  ## repeat household IDs
   seq_along(household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)),  ## sample household sizes
   household_sizes  ## repeat IDs according to household size
@@ -197,7 +199,9 @@ run_four_scenarios <- function(n = 1000, nt = 150, hmax = 5, nc = 15,
   if (!is.null(seed)) set.seed(seed)  # set random seed if provided for reproducibility
   
   betaA <- runif(n, 0, 1)             # generate n beta values uniformly between 0 and 1
-  h     <- make_households(n, hmax = hmax)  # generate household membership vector
+  household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)
+  h <- rep(seq_along(household_sizes), household_sizes)[1:n]
+  
   alink <- get.net(betaA, nc = nc, h = h)   # generate contact network using betaA and households
   
   simA <- nseir(betaA, h, alink,        # scenario A: full SEIR model
