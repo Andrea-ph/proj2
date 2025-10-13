@@ -1,3 +1,16 @@
+################################################################################
+# Practical 2 — Social Structure in SEIR Models 
+###########################################################
+####proj2 - Group 33 - Extended Statistical Programming ###
+#### Group members as below ################################
+#### Shuo Li (s2795688), Zhe Zhu (s2841606), Antrea Filippou (s2766374)
+#### Contributions as below ################################
+#### Shuo Li: xx (xx%) ###
+#### Zhe Zhu: xx (xx%) ###
+#### Antrea Filippou: xx (xx%) ###
+############################################################
+
+
 make_households <- function(n, hmax, seed = NULL, shuffle = TRUE, return_sizes = FALSE) {
   ## Generate a vector h of household IDs (integers) of length n.
   ## Household sizes are uniformly distributed between 1 and hmax.
