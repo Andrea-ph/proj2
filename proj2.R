@@ -67,7 +67,7 @@ make_households <- function(n, hmax, seed = NULL, shuffle = TRUE, return_sizes =
 
 make_households(n = 1000, hmax = 5, seed = 123, return_sizes = TRUE)
 
-# = Step 2: Build non-household contact network =
+
 # ===============================================
 # Function: get.net(beta, nc = 15, h = NULL)
 # Builds a symmetric network of regular (non-household) contacts.
@@ -126,7 +126,7 @@ get.net <- function(beta, nc = 15, h = NULL) {
   return(alink)                             ## return final list of contact links
 }
 
-# = Step 3: SEIR simulator with households & contact network =
+# 
 # ============================================================
 # Implements:
 # - E->I with daily probability gamma, I->R with daily probability delta.
@@ -241,8 +241,7 @@ nseir <- function(beta, h, alink,
   return(out)
 }
 
-# =======================================
-# = Step 4: Plotting of SEIR trajectories
+#
 # =======================================
 
 plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
@@ -257,8 +256,7 @@ plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
          legend = c("S","E","I","R"), bg = "white", cex = 0.9)
 }
 
-# =========================================================
-# = Step 5: Compare 4 scenarios & side-by-side plotting   =
+# 
 # =========================================================
 # Scenarios:
 # A) Full model, beta ~ U(0,1)
@@ -316,10 +314,6 @@ run_four_scenarios <- function(n = 1000, nt = 150, hmax = 5, nc = 15,
                  betaA = betaA, betaC = betaC, h = h,
                  alinkA = alink, alinkC = alinkC))
 }
-
-################################################################################
-#                          — End of function definitions —                     #
-################################################################################
 
 # ===========================
 # Example: run the scenarios
