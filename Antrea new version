@@ -1,0 +1,278 @@
+################################################################################
+# Practical 2 — Social Structure in SEIR Models 
+###########################################################
+####proj2 - Group 33 - Extended Statistical Programming ###
+#### Group members as below ################################
+#### Shuo Li (s2795688), Zhe Zhu (s2841606), Antrea Filippou (s2766374)
+#### Contributions as below ################################
+#### Shuo Li: xx (xx%) ###
+#### Zhe Zhu: xx (xx%) ###
+#### Antrea Filippou: xx (xx%) ###
+############################################################
+
+
+################################################################################
+# Practical 2 — Social Structure in SEIR Models (Base R only)
+
+# =========================
+# = Step 1: Households   =
+# =========================
+# Creates vector h of household IDs (integers)
+# Sizes are uniformly distributed between 1 and hmax.
+# Robust trimming to exactly n people; no size-0 households
+.
+##STEP 1####
+# Parameters
+n <- 1000      # number of people
+hmax <- 5      # maximum household size
+
+# One line code to create h (household assignments)
+h <- rep(seq_along(household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)), household_sizes)[1:n]
+
+# Verification
+cat("Number of people:", length(h), "\n")
+cat("Number of households:", length(unique(h)), "\n")
+cat("Distribution of household sizes:\n")
+print(table(table(h)))
+
+
+# ============================================
+# = Step 2: Build non-household contact net  =
+# ============================================
+get.net <- function(beta, nc = 15) {
+  n <- length(beta)
+  beta_bar <- mean(beta)
+  
+  # Handle small populations
+  if (n < 2) return(vector("list", n))
+  
+  # Initialize an empty contact list (adjacency list)
+  contacts <- vector("list", n)
+  
+  # Create a list of household memberships (global variable h)
+  # Each household ID in 'h' becomes a key containing the people in that household
+  households <- split(seq_len(n), h)
+  
+  # Loop through all unique pairs (i, j) where i < j
+  for (i in 1:(n - 1)) {
+    js <- (i + 1):n
+    
+    # Exclude individuals who are in the same household as i
+    same_household <- households[[as.character(h[i])]]
+    js <- setdiff(js, same_household)
+    
+    if (length(js) == 0) next  # Skip if no eligible contacts
+    
+    # Calculate the probability of forming a link between i and each j
+    prob <- (nc * beta[i] * beta[js]) / (beta_bar^2 * (n - 1))
+    
+    # Ensure probabilities are within [0, 1]
+    prob[prob < 0] <- 0
+    prob[prob > 1] <- 1
+    
+    # Generate random numbers and create links based on the probabilities
+    u <- runif(length(js))
+    linked <- js[u < prob]
+    
+    # Add links symmetrically (if i is linked to j, j must also link to i)
+    if (length(linked) > 0) {
+      contacts[[i]] <- c(contacts[[i]], linked)
+      for (j in linked) {
+        contacts[[j]] <- c(contacts[[j]], i)
+      }
+    }
+  }
+  
+  # Clean up: sort and remove any duplicate entries
+  for (i in seq_len(n)) {
+    if (length(contacts[[i]]) > 0) {
+      contacts[[i]] <- sort(unique(contacts[[i]]))
+    }
+  }
+  
+  return(contacts)
+}
+
+# ============================================================
+# = Step 3: SEIR simulator with households & contact network =
+# ============================================================
+nseir <- function(beta, h, alink, alpha = c(.1, .01, .01), 
+                  delta = .2, gamma = .4, nc = 15, nt = 100, pinf = .005) {
+  
+  n <- length(beta)
+  beta_bar <- mean(beta)
+  
+  alpha_h <- alpha[1]  # household
+  alpha_c <- alpha[2]  # regular contacts
+  alpha_r <- alpha[3]  # random mixing
+  
+  # States: 1=S, 2=E, 3=I, 4=R
+  state <- rep(1, n)
+  
+  # Initial infected (ensure at least 1 if desired)
+  k0 <- max(1, round(n * pinf))
+  initial_infected <- sample(n, k0)
+  state[initial_infected] <- 3
+  
+  # Household membership
+  households <- split(seq_len(n), h)
+  
+  # Storage
+  S <- numeric(nt); E <- numeric(nt); I <- numeric(nt); R <- numeric(nt)
+  t <- 1:nt
+  
+  # Precompute factor for random mixing
+  base_r <- (alpha_r * nc) / (beta_bar^2 * (n - 1))
+  
+  for (day in 1:nt) {
+    # Record current counts (choose this spot or move to end for "after transitions")
+    S[day] <- sum(state == 1)
+    E[day] <- sum(state == 2)
+    I[day] <- sum(state == 3)
+    R[day] <- sum(state == 4)
+    
+    new_state <- state
+    
+    # I -> R
+    I_indices <- which(state == 3)
+    if (length(I_indices)) {
+      recover <- runif(length(I_indices)) < delta
+      new_state[I_indices[recover]] <- 4
+    }
+    
+    # E -> I
+    E_indices <- which(state == 2)
+    if (length(E_indices)) {
+      progress <- runif(length(E_indices)) < gamma
+      new_state[E_indices[progress]] <- 3
+    }
+    
+    # S -> E infections
+    S_indices <- which(state == 1)
+    I_indices <- which(state == 3)
+    
+    if (length(S_indices) && length(I_indices)) {
+      infected <- rep(FALSE, n)
+      
+      for (i in I_indices) {
+        susceptible <- S_indices[!infected[S_indices]]
+        if (!length(susceptible)) break
+        
+        # 1) Household
+        household_members <- households[[as.character(h[i])]]
+        household_susceptible <- intersect(susceptible, household_members)
+        if (length(household_susceptible)) {
+          infect_household <- runif(length(household_susceptible)) < alpha_h
+          infected[household_susceptible[infect_household]] <- TRUE
+        }
+        
+        # 2) Regular contacts
+        contacts <- alink[[i]]
+        if (length(contacts)) {
+          contact_susceptible <- intersect(susceptible, contacts)
+          if (length(contact_susceptible)) {
+            infect_contacts <- runif(length(contact_susceptible)) < alpha_c
+            infected[contact_susceptible[infect_contacts]] <- TRUE
+          }
+        }
+        
+        # 3) Random mixing (irrespective of relations)
+        susceptible <- S_indices[!infected[S_indices]]  # refresh after 1) & 2)
+        if (length(susceptible)) {
+          prob_random <- base_r * beta[i] * beta[susceptible]
+          prob_random[prob_random < 0] <- 0
+          prob_random[prob_random > 1] <- 1
+          infect_random <- runif(length(susceptible)) < prob_random
+          infected[susceptible[infect_random]] <- TRUE
+        }
+      }
+      
+      new_state[infected] <- 2
+    }
+    
+    state <- new_state
+  }
+  
+  list(S = S, E = E, I = I, R = R, t = t)
+}
+
+# =======================================
+# = Step 4: Plotting of SEIR trajectories
+# =======================================
+plot.seir <- function(sim) {
+  t <- sim$t; S <- sim$S; E <- sim$E; I <- sim$I; R <- sim$R
+  plot(t, S, type="l", xlab="Time (days)", ylab="Count", ylim=c(0, max(S,E,I,R)))
+  lines(t, E, col=4); lines(t, I, col=2); lines(t, R, col=3)
+  legend("topright", c("S","E","I","R"), col=c(1,4,2,3), lwd=2, bty="n")
+  points(t[which.max(I)], max(I), pch=19, col=2)  # optional: mark I peak
+}
+
+
+
+# =============================================================
+# = Step 5: Compare 4 scenarios of the SEIR social model      =
+# =============================================================
+
+## According to the brief:
+## 1) Start with the full model (default parameters).
+## 2) Remove household and network structure:
+##    set alpha_h = alpha_c = 0, alpha_r = 0.04 (same average contacts).
+## 3) Repeat full model but with constant beta = mean(beta).
+## 4) Combine both: constant beta + random mixing only.
+## Then compare the dynamics by plotting side-by-side.
+
+set.seed(123)
+
+# Parameters
+n    <- 1000
+hmax <- 5
+nc   <- 15
+nt   <- 120
+pinf <- 0.01
+
+# --- Household structure (reuse Step 1 idea)
+h <- rep(seq_along(household_sizes <- sample(1:hmax,
+                                             ceiling(n/mean(1:hmax)), replace = TRUE)), household_sizes)[1:n]
+
+# --- Sociability (β) as Uniform(0,1)
+beta_var   <- runif(n)
+beta_const <- rep(mean(beta_var), n)
+
+# --- Build contact networks (uses get.net from Step 2)
+alink_full  <- get.net(beta = beta_var, nc = nc)   # full network
+alink_empty <- vector("list", n)                   # no network contacts
+
+# --- α parameters
+alpha_full   <- c(0.1, 0.01, 0.01)  # default: household, contacts, random
+alpha_random <- c(0.0, 0.0, 0.04)   # random mixing only
+
+# --- Run four scenarios using nseir() from Step 3
+
+# (A) Full model, variable beta
+sim_A <- nseir(beta_var, h, alink_full, alpha = alpha_full, nc = nc, nt = nt, pinf = pinf)
+
+# (B) Random mixing only, variable beta
+sim_B <- nseir(beta_var, h, alink_empty, alpha = alpha_random, nc = nc, nt = nt, pinf = pinf)
+
+# (C) Full model, constant beta
+sim_C <- nseir(beta_const, h, alink_full, alpha = alpha_full, nc = nc, nt = nt, pinf = pinf)
+
+# (D) Random mixing only, constant beta
+sim_D <- nseir(beta_const, h, alink_empty, alpha = alpha_random, nc = nc, nt = nt, pinf = pinf)
+
+# --- Plot the results side by side
+par(mfrow = c(2, 2), mar = c(4,4,2,1))
+
+plot.seir(sim_A)
+title("A) Full model, β ~ U(0,1)")
+
+plot.seir(sim_B)
+title("B) Random mixing only (αh=αc=0, αr=0.04)")
+
+plot.seir(sim_C)
+title("C) Full model, constant β = mean(U(0,1))")
+
+plot.seir(sim_D)
+title("D) Random mixing only + constant β")
+
+par(mfrow = c(1, 1))
