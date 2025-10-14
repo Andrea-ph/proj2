@@ -109,12 +109,12 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
   beta_bar <- mean(beta) ## mean sociability
   tvec <- seq_len(nt) ## vector of time steps
   
-  S_CODE <- 1L; E_CODE <- 2L; I_CODE <- 3L; R_CODE <- 4L ## numeric codes for states
+  S_CODE <- 1L; E_CODE <- 2L; I_CODE <- 3L; R_CODE <- 4L ## codes for states
   
-  state <- rep.int(S_CODE, n) # initialize all as susceptible
-  nI0 <- max(1L, round(pinf * n))                  # compute initial infected count
-  initI <- sample.int(n, size = nI0, replace = FALSE) # randomly select initial infected
-  state[initI] <- I_CODE                            # assign initial infections
+  state <- rep.int(S_CODE, n) ## initial state: all susceptible
+  nI0 <- max(1L, round(pinf * n)) ## compute initial infectious count
+  initI <- sample.int(n, size = nI0, replace = FALSE) 
+  state[initI] <- I_CODE ## set initial infections
   
   H_ids <- unique(h) ## unique household IDs
   HH <- vector("list", length(H_ids))              # initialize household membership list
