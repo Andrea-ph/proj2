@@ -1,4 +1,4 @@
-###########################################################
+a###########################################################
 ####proj2 - Group 33 - Extended Statistical Programming ###
 #### Group members as below ################################
 #### Shuo Li (s2795688), Zhe Zhu (s2841606), Antrea Filippou (s2766374)
@@ -126,7 +126,7 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
   I_daily <- integer(nt)                            # initialize daily infectious counts
   R_daily <- integer(nt)                            # initialize daily recovered counts
   
-  c_mix <- alpha[3] * nc / (bbar^2 * (n - 1))      # random mixing constant
+  c_mix <- alpha[3] * nc / (beta_bar^2 * (n - 1))      # random mixing constant
   
   for (tt in tvec) {                                # loop over each day
     indS <- which(state == S_CODE)                 # indices of susceptible individuals
