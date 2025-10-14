@@ -1,25 +1,3 @@
-##########################################################
-## Code to simulate epidemic dynamics using a social-structured SEIR model.
-## The challenge is to extend the classic SEIR model by introducing 
-## realistic social structures into how infections spread.
-## In the basic SEIR model, every individual mixes at random. 
-## Here we assume that people live in households and also have regular 
-## contact networks, reflecting social interactions such as families, workplaces, 
-## and friend groups.
-## There are n individuals, each in one of four states: 
-## Susceptible (S), Exposed (E), Infectious (I), or Recovered (R).
-## Transitions between these states occur with the following daily probabilities:
-##   - E → I : with probability γ (infection incubation rate)
-##   - I → R : with probability δ (recovery rate)
-##   - I → R : depends on social contact structure:
-##   1. Within-household infection occurs with probability αh per infectious member.
-##   2. Network-based infection occurs with probability αc between connected contacts.
-##   3. Random background infection occurs with probability αr * nc * (βi * βj) /
-##      (mean(β)^2 * (n - 1)), where βi represents sociability (infectiousness)
-##      and nc is the average number of daily contacts.
-## The aim is to investigate how incorporating social structure changes 
-## epidemic outcomes compared to purely random mixing.
-# Practical 2 — Social Structure in SEIR Models 
 ###########################################################
 ####proj2 - Group 33 - Extended Statistical Programming ###
 #### Group members as below ################################
@@ -30,8 +8,26 @@
 #### Antrea Filippou: xx (xx%) ###
 ############################################################
 
-## Code to simulate the SEIR models based on social structure.
-
+## Code to simulate epidemic dynamics using a social-structured SEIR model.
+## The challenge is to extend the basic SEIR model by introducing 
+## realistic social structures into how infections spread.
+## In the basic SEIR model, people are assumed to infect each other completely at random. 
+## Here we assume that people live in households and also have their own regular 
+## contact networks, reflecting relatively fixed social interactions like households, workplaces, 
+## and friend groups.
+## Mathematically, there are n people each in one of the following four states: 
+## Susceptible (S), Exposed (E), Infectious (I), or Recovered (R).
+##   Transitions between these states occur with the following daily probabilities:
+## E → I : with daily probability γ (infection incubation rate)
+## I → R : with daily probability δ (recovery rate)
+## I → R : depends on social contact structure:
+## 1. Within-household infection occurs with probability αh per infectious member.
+## 2. Network-based infection occurs with probability αc between connected contacts.
+## 3. Random background infection occurs with probability αr * nc * (βi * βj) /
+##    (mean(β)^2 * (n - 1)), where βi represents sociability (infectiousness)
+##    and nc is the average number of daily contacts.
+## The aim is to investigate how incorporating social structure changes 
+## epidemic outcomes compared to purely random mixing.
 
 #=========================================================
 # Generate household membership vector h
