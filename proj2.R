@@ -89,107 +89,151 @@ get.net <- function(beta, h, nc = 15) {
 }
 
 nseir <- function(beta, h, alink, ## infection rates, household memberships, and regular contacts
-                  alpha = c(0.1, 0.01, 0.01), ## infection (household, network, random)
-                  delta = 0.2, ## daily probability of recovery
-                  gamma = 0.4, ## daily probability of becoming infectious, incubation probability
-                  nc = 15, ## average number of contacts per person
-                  nt = 100, ## number of days
-                  pinf = 0.005)# proportion of the initial population to randomly start in the I state 
-                  {
-## This function simulates an SEIR epidemic model with household, regular contact network and random mixing. 
-## It tracks transitions between S, E, I, and R states over nt days for a population with given beta, h, and alink.
-## The model includes infection spread through household, regular network, and random contacts 
-## with respective strengths alpha, and accounts for daily infection, exposure, and 
-## recovery probabilities (gamma, delta). It returns a list containing daily totals 
-## of S, E, I, R, and the time vector t.
+                 alpha = c(0.1, 0.01, 0.01), ## infection (household, network, random)
+                 delta = 0.2, ## daily probability of recovery
+                 gamma = 0.4, ## daily probability of becoming infectious, incubation probability
+                 nc = 15, ## average number of contacts per person
+                 nt = 100, ## number of days
+                 pinf = 0.005, ## proportion of the initial population to randomly start in the I state 
+                 seed = NULL, ## optional RNG seed for reproducibility
+                 exact_random = FALSE ## if TRUE compute exact random-product (slower)
+) {
+  ## This function simulates an SEIR epidemic model with household, regular contact network and random mixing. 
+  ## It tracks transitions between S, E, I, and R states over nt days for a population with given beta, h, and alink.
+  ## The model includes infection spread through household, regular network, and random contacts 
+  ## with respective strengths alpha, and accounts for daily infection, exposure, and 
+  ## recovery probabilities (gamma, delta). It returns a list containing daily totals 
+  ## of S, E, I, R, and the time vector t.
+  if (!is.null(seed)) set.seed(seed) ## set RNG seed if provided
   
-  n <- length(beta) ## total number of individuals
-  stopifnot(length(h) == n, length(alink) == n) ## check the inputs, vector lengths match
+  n <- length(beta) ## total number of individuals            
+  if (!is.numeric(beta) || n < 1) stop("beta must be a non-empty numeric vector")
+  if (length(h) != n) stop("h must be same length as beta")
+  if (!is.list(alink) || length(alink) != n) stop("alink must be a list of length n")
+  if (!is.numeric(alpha) || length(alpha) < 3) stop("alpha must be numeric length >= 3")
   
   S_CODE <- 1L; E_CODE <- 2L; I_CODE <- 3L; R_CODE <- 4L ## codes for states
   
   state <- rep.int(S_CODE, n) ## initial state: all susceptible
   nI0 <- max(1L, round(pinf * n)) ## compute initial infectious count
   initI <- sample.int(n, size = nI0, replace = FALSE) 
-  state[initI] <- I_CODE ## set initial infections
+  state[initI] <- I_CODE ## set initial infections      
   
-  ## build household membership list
   H_ids <- unique(h) ## unique household IDs
   HH <- vector("list", length(H_ids)) ## initialize household membership list
   names(HH) <- as.character(H_ids) ## name elements by household ID
-  for (hid in H_ids) HH[[as.character(hid)]] <- which(h == hid) ## store household members
-
-  ## store the daily counts
+  for (hid in H_ids) HH[[as.character(hid)]] <- which(h == hid)## store household members
+  
   S_daily <- integer(nt) ## initialize daily susceptible counts
   E_daily <- integer(nt) ## initialize daily exposed counts
   I_daily <- integer(nt) ## initialize daily infectious counts
   R_daily <- integer(nt) ## initialize daily recovered counts
   tvec <- seq_len(nt) ## vector of time steps
-
+  
   beta_bar <- mean(beta) ## mean sociability
-  constant_mix <- alpha[3] * nc / (beta_bar^2 * (n - 1)) ## constant for random mixing 
-
-  ## main simulation loop
-  for (tt in tvec) {                                # loop over each day
-    indS <- which(state == S_CODE)                 # indices of susceptible individuals
-    indE <- which(state == E_CODE)                 # indices of exposed individuals
-    indI <- which(state == I_CODE)                 # indices of infectious individuals
-    indR <- which(state == R_CODE)                 # indices of recovered individuals
+  if (beta_bar <= 0) stop("mean(beta) must be positive")
+  constant_mix <- alpha[3] * nc / (beta_bar^2 * (n - 1)) ## constant for random mixing
+  
+for (tt in tvec) {
+  # record current counts (counts at day start)
+  S_daily[tt] <- sum(state == S_CODE)
+  E_daily[tt] <- sum(state == E_CODE)
+  I_daily[tt] <- sum(state == I_CODE)
+  R_daily[tt] <- sum(state == R_CODE)
+  
+  
+  indS <- which(state == S_CODE) ## indices of susceptible individuals
+  indE <- which(state == E_CODE) ## indices of exposed individuals
+  indI <- which(state == I_CODE) ## indices of infectious individuals
+  
+  # ---------- Compute S -> E (infections) based on day-start infecteds ----------
+  if (length(indS) > 0 && length(indI) > 0) {
+    # Household component: number of infecteds in each household
+    I_tab <- table(h[indI])                          # counts infected per household (only households with infected appear)
+    # map infected counts to each susceptible's household (may produce NA where count is 0)
+    I_in_S_hh <- as.integer(I_tab[as.character(h[indS])])
+    I_in_S_hh[is.na(I_in_S_hh)] <- 0                  # replace NA (no infecteds in that hh) by 0
+    P_avoid_hh <- (1 - alpha[1]) ^ I_in_S_hh          # prob avoid infection from household infecteds
     
-    S_daily[tt] <- length(indS)                    # record number of susceptibles
-    E_daily[tt] <- length(indE)                    # record number of exposed
-    I_daily[tt] <- length(indI)                    # record number of infectious
-    R_daily[tt] <- length(indR)                    # record number of recovered
-    
-    if (length(indE)) {                             # E -> I transition
-      uEI <- runif(length(indE))                    # random numbers for transition
-      toI <- indE[uEI < gamma]                      # exposed becoming infectious
-      if (length(toI)) state[toI] <- I_CODE         # update state to infectious
+    # Network component: count infectious neighbors for each susceptible
+    inf_flag <- logical(n); inf_flag[indI] <- TRUE   # logical flag vector for quick membership tests
+    # get neighbor lists for susceptibles
+    neigh_lists <- alink[indS]
+    # count infected neighbors (vectorized with vapply for speed and consistency)
+    if (length(neigh_lists) > 0L) {
+      count_I_neigh <- vapply(neigh_lists, function(nb) {
+        if (length(nb) == 0L) return(0L)
+        sum(inf_flag[nb])
+      }, integer(1))
+    } else {
+      count_I_neigh <- integer(0)
     }
+    P_avoid_net <- (1 - alpha[2]) ^ count_I_neigh
     
-    indI <- which(state == I_CODE)                 # re-identify infectious individuals
-    if (length(indI)) {                             # I -> R transition
-      uIR <- runif(length(indI))                    # random numbers for recovery
-      toR <- indI[uIR < delta]                      # identify recovering individuals
-      if (length(toR)) state[toR] <- R_CODE         # update state to recovered
-    }
-    
-    indS <- which(state == S_CODE)                 # re-identify susceptible indices
-    indI <- which(state == I_CODE)                 # re-identify infectious indices
-    if (length(indS) && length(indI)) {            # proceed if both S and I exist
-      
-      I_hh <- integer(length(H_ids))               # initialize infected counts per household
-      names(I_hh) <- as.character(H_ids)           # name by household ID
-      I_tab <- table(h[indI])                       # count infectious per household
-      if (length(I_tab)) I_hh[names(I_tab)] <- as.integer(I_tab) # fill household infection counts
-      
-      I_in_S_hh <- I_hh[as.character(h[indS])]    # infectious in each susceptible's household
-      Pnh <- (1 - alpha[1])^I_in_S_hh             # probability of avoiding household infection
-      
-      I_flag <- logical(n)                          # initialize vector for infectious individuals
-      I_flag[indI] <- TRUE                          # mark infectious individuals
-      count_I_in_S <- integer(length(indS))        # initialize contact counts per susceptible
-      
-      for (k in seq_along(indS)) {                 # loop over each susceptible
-        j <- indS[k]                                # current susceptible index
-        nbrs <- alink[[j]]                          # get neighbors from network
-        if (length(nbrs)) count_I_in_S[k] <- sum(I_flag[nbrs]) # count infectious neighbors
+    # Random mixing component: approximate avoid prob using exponential approx
+    sum_beta_I <- sum(beta[indI])
+    if (sum_beta_I == 0) {
+      P_avoid_rand <- rep(1, length(indS))           # no infectiousness => avoid prob = 1
+    } else {
+      if (!exact_random) {
+        # approximation: avoid probability = exp(- c_mix * beta_j * sum_beta_I)
+        P_avoid_rand <- exp(- constant_mix * beta[indS] * sum_beta_I)
+        P_avoid_rand[P_avoid_rand < 0] <- 0
+        P_avoid_rand[P_avoid_rand > 1] <- 1
+      } else {
+        # exact product form (slow): prod_{i in I} (1 - p_ij)
+        P_avoid_rand <- numeric(length(indS))
+        for (k in seq_along(indS)) {
+          j <- indS[k]
+          pij <- constant_mix * beta[indI] * beta[j]
+          pij[pij > 1] <- 1
+          if (any(pij >= 1)) {
+            P_avoid_rand[k] <- 0
+          } else {
+            P_avoid_rand[k] <- exp(sum(log1p(-pij)))
+          }
+        }
       }
-      
-      Pnc <- (1 - alpha[2])^count_I_in_S            # probability avoiding network infection
-      sum_beta_I <- sum(beta[indI])                 # sum of infectiousness
-      Pnr <- exp(- constant_mix * beta[indS] * sum_beta_I) # probability avoiding random infection
-      
-      P_not_infected <- Pnh * Pnc * Pnr            # overall probability of avoiding infection
-      P_infected <- 1 - P_not_infected             # probability of being infected
-      
-      uSE <- runif(length(indS))                    # random numbers for S->E
-      toE <- indS[uSE < P_infected]                # identify susceptible becoming exposed
-      if (length(toE)) state[toE] <- E_CODE        # update state to exposed
     }
+    
+    # combine avoidance probabilities (assume independence of sources)
+    P_avoid_all <- P_avoid_hh * P_avoid_net * P_avoid_rand
+    P_infect <- 1 - P_avoid_all
+    
+    # perform Bernoulli draws for S->E
+    draws_SE <- runif(length(indS)) < P_infect
+    newE <- indS[draws_SE]                            # susceptibles becoming exposed today
+  } else {
+    newE <- integer(0)                                # no new exposures if no S or no I
   }
   
-  list(S = S_daily, E = E_daily, I = I_daily, R = R_daily, t = tvec) # return daily SEIR counts
+  # ---------- Compute E -> I (progression) ----------
+  if (length(indE) > 0) {
+    draws_EI <- runif(length(indE)) < gamma
+    newI_fromE <- indE[draws_EI]                      # exposed becoming infectious today
+  } else {
+    newI_fromE <- integer(0)
+  }
+  
+  # ---------- Compute I -> R (recoveries) ----------
+  if (length(indI) > 0) {
+    draws_IR <- runif(length(indI)) < delta
+    newR <- indI[draws_IR]                            # infectious recovering today
+  } else {
+    newR <- integer(0)
+  }
+  
+  # ---------- Apply updates once (based on day-start indices) ----------
+  # Important: updates are based on day-start sets so newly created categories do not act immediately
+  if (length(newE) > 0) state[newE] <- E_CODE
+  if (length(newI_fromE) > 0) state[newI_fromE] <- I_CODE
+  if (length(newR) > 0) state[newR] <- R_CODE
+  
+  # next day
+} # end days loop
+
+# return daily time series (counts at day starts)
+return(list(S = S_daily, E = E_daily, I = I_daily, R = R_daily, t = tvec))
 }
 
 plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
