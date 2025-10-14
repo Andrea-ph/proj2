@@ -30,9 +30,6 @@
 ## The aim is to investigate how incorporating social structure changes 
 ## epidemic dynamic compared to purely random mixing.
 
-#=========================================================
-# Generate household membership vector h
-#=========================================================
 hmax<-5  ## use household size maximum to be 5 by default 
 n<-1000  ## our code work with any population sizes, here we test and develop with n=1,000
 
