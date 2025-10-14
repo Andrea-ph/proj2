@@ -13,8 +13,8 @@
 #=========================================================
 # Generate household membership vector h
 #=========================================================
-hmax<-5
-n<-1000
+hmax<-5  ## household sizes should be uniformly distributed between 1 and hmax
+n<-1000  ## population sizes
 h <- rep(  ## repeat household IDs
   seq_along(household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)),  ## sample household sizes
   household_sizes  ## repeat IDs according to household size
