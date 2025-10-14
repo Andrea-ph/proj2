@@ -176,7 +176,7 @@ for (tt in tvec) {
       P_avoid_rand <- rep(1, length(indS))           # no infectiousness => avoid prob = 1
     } else {
       if (!exact_random) {
-        # approximation: avoid probability = exp(- c_mix * beta_j * sum_beta_I)
+        # approximation: avoid probability = exp(- constant_mix * beta_j * sum_beta_I)
         P_avoid_rand <- exp(- constant_mix * beta[indS] * sum_beta_I)
         P_avoid_rand[P_avoid_rand < 0] <- 0
         P_avoid_rand[P_avoid_rand > 1] <- 1
