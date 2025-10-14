@@ -10,6 +10,9 @@
 #### Antrea Filippou: xx (xx%) ###
 ############################################################
 
+## Code to simulate the SEIR models based on social structure.
+
+
 #=========================================================
 # Generate household membership vector h
 #=========================================================
