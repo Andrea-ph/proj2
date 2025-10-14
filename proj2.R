@@ -30,8 +30,8 @@ a###########################################################
 ## The aim is to investigate how incorporating social structure changes 
 ## epidemic dynamic compared to purely random mixing.
 
-hmax<-5  ## use household size maximum to be 5 by default 
-n<-1000  ## our code work with any population sizes, here we test and develop with n=1,000
+hmax < -5  ## use household size maximum to be 5 by default 
+n <- 1000  ## our code work with any population sizes, here we test and develop with n=1,000
 
 h <- rep(  ## repeat household IDs
   seq_along(household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)),  
@@ -106,9 +106,6 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
   n <- length(beta) ## total number of individuals
   stopifnot(length(h) == n, length(alink) == n) ## check the inputs, vector lengths match
   
-  beta_bar <- mean(beta) ## mean sociability
-  tvec <- seq_len(nt) ## vector of time steps
-  
   S_CODE <- 1L; E_CODE <- 2L; I_CODE <- 3L; R_CODE <- 4L ## codes for states
   
   state <- rep.int(S_CODE, n) ## initial state: all susceptible
@@ -116,18 +113,23 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
   initI <- sample.int(n, size = nI0, replace = FALSE) 
   state[initI] <- I_CODE ## set initial infections
   
+  ## build household membership list
   H_ids <- unique(h) ## unique household IDs
-  HH <- vector("list", length(H_ids))              # initialize household membership list
-  names(HH) <- as.character(H_ids)                # name elements by household ID
-  for (hid in H_ids) HH[[as.character(hid)]] <- which(h == hid) # store household members
-  
-  S_daily <- integer(nt)                            # initialize daily susceptible counts
-  E_daily <- integer(nt)                            # initialize daily exposed counts
-  I_daily <- integer(nt)                            # initialize daily infectious counts
-  R_daily <- integer(nt)                            # initialize daily recovered counts
-  
-  c_mix <- alpha[3] * nc / (beta_bar^2 * (n - 1))      # random mixing constant
-  
+  HH <- vector("list", length(H_ids)) ## initialize household membership list
+  names(HH) <- as.character(H_ids) ## name elements by household ID
+  for (hid in H_ids) HH[[as.character(hid)]] <- which(h == hid) ## store household members
+
+  ## store the daily counts
+  S_daily <- integer(nt) ## initialize daily susceptible counts
+  E_daily <- integer(nt) ## initialize daily exposed counts
+  I_daily <- integer(nt) ## initialize daily infectious counts
+  R_daily <- integer(nt) ## initialize daily recovered counts
+  tvec <- seq_len(nt) ## vector of time steps
+
+  beta_bar <- mean(beta) ## mean sociability
+  constant_mix <- alpha[3] * nc / (beta_bar^2 * (n - 1)) ## constant for random mixing 
+
+  ## main simulation loop
   for (tt in tvec) {                                # loop over each day
     indS <- which(state == S_CODE)                 # indices of susceptible individuals
     indE <- which(state == E_CODE)                 # indices of exposed individuals
@@ -176,7 +178,7 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
       
       Pnc <- (1 - alpha[2])^count_I_in_S            # probability avoiding network infection
       sum_beta_I <- sum(beta[indI])                 # sum of infectiousness
-      Pnr <- exp(- c_mix * beta[indS] * sum_beta_I) # probability avoiding random infection
+      Pnr <- exp(- constant_mix * beta[indS] * sum_beta_I) # probability avoiding random infection
       
       P_not_infected <- Pnh * Pnc * Pnr            # overall probability of avoiding infection
       P_infected <- 1 - P_not_infected             # probability of being infected
