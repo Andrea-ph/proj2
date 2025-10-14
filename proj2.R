@@ -35,9 +35,9 @@ n <- 1000  ## our code work with any population sizes, here we test and develop 
 
 h <- rep(  ## repeat household IDs
   seq_along(household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)),  
-  ## sample from an integer sequence ranging from 1 to hmax =5 to generate a vector 
-  ## representing the household sizes. Repeated selection is allowed in sampling 
-  ## to ensure the uniform distribution of household sizes.
+## sample from an integer sequence ranging from 1 to hmax =5 to generate a vector 
+## representing the household sizes. Repeated selection is allowed in sampling 
+## to ensure the uniform distribution of household sizes.
   household_sizes  ## repeat IDs according to household size
 )[1:n]  ## trim vector to length n
 
@@ -98,12 +98,12 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
                  seed = NULL, ## optional RNG seed for reproducibility
                  exact_random = FALSE ## if TRUE compute exact random-product (slower)
 ) {
-  ## This function simulates an SEIR epidemic model with household, regular contact network and random mixing. 
-  ## It tracks transitions between S, E, I, and R states over nt days for a population with given beta, h, and alink.
-  ## The model includes infection spread through household, regular network, and random contacts 
-  ## with respective strengths alpha, and accounts for daily infection, exposure, and 
-  ## recovery probabilities (gamma, delta). It returns a list containing daily totals 
-  ## of S, E, I, R, and the time vector t.
+## This function simulates an SEIR epidemic model with household, regular contact network and random mixing. 
+## It tracks transitions between S, E, I, and R states over nt days for a population with given beta, h, and alink.
+## The model includes infection spread through household, regular network, and random contacts 
+## with respective strengths alpha, and accounts for daily infection, exposure, and 
+## recovery probabilities (gamma, delta). It returns a list containing daily totals 
+## of S, E, I, R, and the time vector t.
   if (!is.null(seed)) set.seed(seed) ## set RNG seed if provided
   
   n <- length(beta) ## total number of individuals            
@@ -237,8 +237,8 @@ return(list(S = S_daily, E = E_daily, I = I_daily, R = R_daily, t = tvec))
 }
 
 plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
-  ## combines SEIR into a matrix and plot their trajectories over time.
-  ## use different colors to represent each state and add a legend to distinguish the four lines.
+## combines SEIR into a matrix and plot their trajectories over time.
+## use different colors to represent each state and add a legend to distinguish the four lines.
   stopifnot(all(c("S","E","I","R","t") %in% names(sim))) # check that sim contains all required components
   mat <- cbind(S = sim$S, E = sim$E, I = sim$I, R = sim$R) # combine SEIR vectors into a single matrix for plotting
   op <- par(mar = c(4.2, 4.5, 3.5, 1.2)) # set plot margins for readability
@@ -250,22 +250,17 @@ plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
          legend = c("S","E","I","R"), bg = "white", cex = 0.52) # specify legend labels, background, and font size
 }
 
-
-# ===============================================
-# = Compare 4 scenarios & side-by-side plotting =
-# ===============================================
-
 run_four_scenarios <- function(n = 1000, nt = 150, hmax = 5, nc = 15,
                                alpha_full = c(0.1, 0.01, 0.01),
                                alpha_random_only = c(0, 0, 0.04),
                                delta = 0.2, gamma = 0.4, pinf = 0.005,
                                seed = 1) {
-  # Scenarios:
-# A) Full model, beta ~ U(0,1)
-# B) Random mixing only (alpha_h = alpha_c = 0, alpha_r = 0.04)
-# C) Full model, constant beta = mean(beta)
-# D) Random mixing + constant beta
-# For fair comparison, use a single RNG seed at start, do not re-seed inside each simulation.
+## Scenarios:
+## A) Full model, beta ~ U(0,1)
+## B) Random mixing only (alpha_h = alpha_c = 0, alpha_r = 0.04)
+## C) Full model, constant beta = mean(beta)
+## D) Random mixing + constant beta
+## For fair comparison, use a single RNG seed at start, do not re-seed inside each simulation.
   if (!is.null(seed)) set.seed(seed)  # set random seed if provided for reproducibility
   
   betaA <- runif(n, 0, 1)             # generate n beta values uniformly between 0 and 1
@@ -312,10 +307,8 @@ run_four_scenarios <- function(n = 1000, nt = 150, hmax = 5, nc = 15,
                  alinkA = alink, alinkC = alinkC))
 }
 
-# ===========================
-# Example: run the scenarios
-# ===========================
-# (Reproducible with a single seed at the start; no reseeding inside.)
+## Example: run the scenarios
+## (Reproducible with a single seed at the start; no reseeding inside.)
 
 set.seed(42)
 res <- run_four_scenarios(
@@ -331,10 +324,8 @@ res <- run_four_scenarios(
   seed = NULL  # already seeded above; leave NULL to avoid resetting inside
 )
 
-# ---------------------------
-# Brief commentary:
-# ---------------------------
-#  runs, scenarios with structured mixing (A, C) produce
-# - slightly later and/or lower peaks than pure random mixing (B, D),
-# - smaller final size when heterogeneity in beta is present (A vs C),
-# consistent with the notes: variability and clustering suppress spread.
+## Brief commentary:
+##  runs, scenarios with structured mixing (A, C) produce
+## - slightly later and/or lower peaks than pure random mixing (B, D),
+## - smaller final size when heterogeneity in beta is present (A vs C),
+## consistent with the notes: variability and clustering suppress spread.
