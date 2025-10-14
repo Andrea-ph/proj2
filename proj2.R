@@ -249,7 +249,7 @@ run_four_scenarios <- function(n = 1000, nt = 150, hmax = 5, nc = 15,
 
 set.seed(42)
 res <- run_four_scenarios(
-  n = 10000,
+  n = 1000,
   nt = 100,
   hmax = 5,
   nc = 15,
