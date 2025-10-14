@@ -34,14 +34,16 @@ hmax<-5  ## use household size maximum to be 5 by default
 n<-1000  ## our code work with any population sizes, here we test and develop with n=1,000
 
 h <- rep(  ## repeat household IDs
-  seq_along(household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)),  ## sample household sizes
+  seq_along(household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)),  
+  ## sample from an integer sequence ranging from 1 to hmax =5 to generate a vector 
+  ## representing the household sizes. Repeated selection is allowed in sampling 
+  ## to ensure the uniform distribution of household sizes.
   household_sizes  ## repeat IDs according to household size
 )[1:n]  ## trim vector to length n
 
-#=======================================
-# Function to build contact network
-#=======================================
-get.net <- function(beta, h, nc = 15) {  ## function to generate contact network
+get.net <- function(beta, h, nc = 15) {  
+## function to generate regular contact network
+## please note that people in the same household are excluded from such contacts. 
   n <- length(beta)  ## total number of individuals
   if (n < 2L) return(vector("list", n))  ## return empty list if less than 2 people
   bbar <- mean(beta)  ## mean infectivity
