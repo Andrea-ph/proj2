@@ -22,7 +22,7 @@
 ##   infect a person j in state S:
 ##   1. Within-household infection occurs with a daily probability αh of person i infecting j.
 ##   2. Regular contact network based infection occurs with a daily probability αc of i infecting j.
-##   3. Random background infection occurs with probability αr * nc * (βi * βj) /
+##   3. Random background infection occurs with probability αr * nc * (β_i * β_j) /
 ##      (mean(β)^2 * (n - 1)), where βi represents 'sociability' (infectiousness) parameter for the ith person
 ##      and nc is the average number of contacts per person.
 ## E → I : with daily probability γ (infection incubation rate)
@@ -44,10 +44,12 @@ h <- rep(  ## repeat household IDs
 get.net <- function(beta, h, nc = 15) {  
 ## function to generate regular contact network
 ## please note that people in the same household are excluded from such contacts. 
+## beta is the n vector of β_i value for each person
+## nc is the average number of contacts per person
   n <- length(beta)  ## total number of individuals
   if (n < 2L) return(vector("list", n))  ## return empty list if less than 2 people
-  bbar <- mean(beta)  ## mean infectivity
-  cst <- nc / (bbar^2 * (n - 1))  ## constant to match expected degree
+  bbar <- mean(beta)  ## mean sociability (infectivity) parameter
+  cst <- nc / (bbar^2 * (n - 1))  ## constant factor for exact pairwise probability: Pr_ij = cst * β_i * β_j
   alink <- vector("list", n)  ## initialize adjacency list
   
   H_ids <- unique(h)  ## unique household IDs
@@ -61,10 +63,10 @@ get.net <- function(beta, h, nc = 15) {
     js <- (i + 1):n   ## potential partners to avoid duplicates
     hid <- h[i]  ## get household ID of i
     hh_members <- HH[[as.character(hid)]]  ## get members of i's household
-    js <- setdiff(js, hh_members)  ## remove household members from partners
+    js <- setdiff(js, hh_members)  ## exclude same household members 
     if (length(js) == 0) next  ## skip if no partners left
     
-    p <- cst * beta[i] * beta[js] ## compute edge probabilities
+    p <- cst * beta[i] * beta[js] ## compute link probabilities
     p[p < 0] <- 0  ## ensure probabilities >= 0
     p[p > 1] <- 1  ## ensure probabilities <= 1
     
@@ -72,9 +74,9 @@ get.net <- function(beta, h, nc = 15) {
     keep <- which(u < p)  ## keep edges where u < probability
     
     if (length(keep)) {  ## if any edges are kept
-      nbrs <- js[keep]   ## get connected partners
-      alink[[i]] <- c(alink[[i]], nbrs)  ## add neighbors to i's adjacency list
-      for (j in nbrs) alink[[j]] <- c(alink[[j]], i) ## add i to each neighbor's adjacency list
+      nbrs <- js[keep]   ## get connected neighbours indices for i
+      alink[[i]] <- c(alink[[i]], nbrs)  ## add neighbours to i's adjacency list
+      for (j in nbrs) alink[[j]] <- c(alink[[j]], i) ## symmetrically add i to each neighbor's adjacency list
     }
   }
   
@@ -83,7 +85,7 @@ get.net <- function(beta, h, nc = 15) {
       alink[[i]] <- sort(unique(alink[[i]]))  ## remove duplicates and sort
   }
   
-  return(alink) ## return final adjacency list
+  return(alink) ## return adjacency list
 }
 
 #=========================================================
