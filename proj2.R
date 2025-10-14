@@ -91,13 +91,20 @@ get.net <- function(beta, h, nc = 15) {
 #=========================================================
 # SEIR simulator with households and contact network
 #=========================================================
-nseir <- function(beta, h, alink,                   # SEIR simulation function
-                  alpha = c(0.1, 0.01, 0.01),      # alpha_h, alpha_c, alpha_r
-                  delta = 0.2,                     # daily probability of recovery
-                  gamma = 0.4,                     # daily probability of becoming infectious
-                  nc = 15,                          # average number of contacts
-                  nt = 100,                         # number of simulated days
-                  pinf = 0.005) {                   # initial infection proportion
+nseir <- function(beta, h, alink, ## infection rates, household memberships, and regular contacts
+                  alpha = c(0.1, 0.01, 0.01), ## infection (household, network, random)
+                  delta = 0.2, ## daily probability of recovery
+                  gamma = 0.4, ## daily probability of becoming infectious
+                  nc = 15, ## average number of contacts
+                  nt = 100, ## number of simulated days
+                  pinf = 0.005)# initial infection proportion 
+                  {
+  ## This function simulates an SEIR epidemic model with household, network and random. 
+  ## It tracks transitions between S, E, I, and R states over nt days for a population with given beta, h, and alink.
+  ## The model includes infection spread through household, network, and random contacts 
+  ## with respective strengths alpha, and accounts for daily infection, exposure, and 
+  ## recovery probabilities (gamma, delta). It returns a list containing daily totals 
+  ## of S, E, I, R, and the time vector t.
   
   n <- length(beta)                                 # total number of individuals
   stopifnot(length(h) == n, length(alink) == n)     # check vector lengths match
@@ -191,6 +198,8 @@ nseir <- function(beta, h, alink,                   # SEIR simulation function
 # =======================================
 
 plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
+  ## combines SEIR into a matrix and plot their trajectories over time.
+  ## use different colors to represent each state and add a legend to distinguish the four lines.
   stopifnot(all(c("S","E","I","R","t") %in% names(sim)))  # check that sim contains all required components
   mat <- cbind(S = sim$S, E = sim$E, I = sim$I, R = sim$R) # combine SEIR vectors into a single matrix for plotting
   op <- par(mar = c(4.2, 4.5, 3.5, 1.2))                  # set plot margins for readability
