@@ -12,28 +12,30 @@
 ## The challenge is to extend the basic SEIR model by introducing 
 ## realistic social structures into how infections spread.
 ## In the basic SEIR model, people are assumed to infect each other completely at random. 
-## Here we assume that people live in households and also have their own regular 
-## contact networks, reflecting relatively fixed social interactions like households, workplaces, 
-## and friend groups.
+## Here we assume that people live in households and also have their own regular contact
+## networks, reflecting relatively fixed social interactions like households, workplaces, and friend groups.
+## Note that n people are uniformly distributed into household of sizes between 1 and hmax=5.
 ## Mathematically, there are n people each in one of the following four states: 
 ## Susceptible (S), Exposed (E), Infectious (I), or Recovered (R).
-##   Transitions between these states occur with the following daily probabilities:
+## Transitions between these states occur with the following daily probabilities:
+## S → E : as a result of infection by someone in state I. Several ways for a person i in State I to
+##   infect a person j in state S:
+##   1. Within-household infection occurs with a daily probability αh of person i infecting j.
+##   2. Regular contact network based infection occurs with a daily probability αc of i infecting j.
+##   3. Random background infection occurs with probability αr * nc * (βi * βj) /
+##      (mean(β)^2 * (n - 1)), where βi represents 'sociability' (infectiousness) parameter for the ith person
+##      and nc is the average number of contacts per person.
 ## E → I : with daily probability γ (infection incubation rate)
 ## I → R : with daily probability δ (recovery rate)
-## S → E : depends on social contact structure:
-## 1. Within-household infection occurs with probability αh per infectious member.
-## 2. Network-based infection occurs with probability αc between connected contacts.
-## 3. Random background infection occurs with probability αr * nc * (βi * βj) /
-##    (mean(β)^2 * (n - 1)), where βi represents sociability (infectiousness)
-##    and nc is the average number of daily contacts.
 ## The aim is to investigate how incorporating social structure changes 
-## epidemic outcomes compared to purely random mixing.
+## epidemic dynamic compared to purely random mixing.
 
 #=========================================================
 # Generate household membership vector h
 #=========================================================
-hmax<-5  ## household sizes should be uniformly distributed between 1 and hmax
-n<-1000  ## population sizes
+hmax<-5  ## use household size maximum to be 5 by default 
+n<-1000  ## our code work with any population sizes, here we test and develop with n=1,000
+
 h <- rep(  ## repeat household IDs
   seq_along(household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)),  ## sample household sizes
   household_sizes  ## repeat IDs according to household size
