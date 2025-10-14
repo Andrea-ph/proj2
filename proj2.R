@@ -49,7 +49,7 @@ get.net <- function(beta, h, nc = 15) {
   n <- length(beta)  ## total number of individuals
   if (n < 2L) return(vector("list", n))  ## return empty list if less than 2 people
   beta_bar <- mean(beta)  ## mean sociability (infectivity) parameter
-  cst <- nc / (beta_bar^2 * (n - 1))  ## constant factor for exact pairwise probability: Pr_ij = cst * β_i * β_j
+  cst <- nc / (beta_bar^2 * (n - 1))  ## constant factor for exact pairwise probability: Pr_ij = cst * β_i * β_j.Note: (n-1) because each person can link to n-1 others (excluding themselves)
   alink <- vector("list", n)  ## initialize adjacency list
   
   H_ids <- unique(h)  ## unique household IDs
