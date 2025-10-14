@@ -204,7 +204,6 @@ plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
 # ===============================================
 # = Compare 4 scenarios & side-by-side plotting =
 # ===============================================
-se a single RNG seed at start, do not re-seed inside each simulation.
 
 run_four_scenarios <- function(n = 1000, nt = 150, hmax = 5, nc = 15,
                                alpha_full = c(0.1, 0.01, 0.01),
