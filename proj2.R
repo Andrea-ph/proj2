@@ -20,7 +20,7 @@
 ##   Transitions between these states occur with the following daily probabilities:
 ## E → I : with daily probability γ (infection incubation rate)
 ## I → R : with daily probability δ (recovery rate)
-## I → R : depends on social contact structure:
+## S → E : depends on social contact structure:
 ## 1. Within-household infection occurs with probability αh per infectious member.
 ## 2. Network-based infection occurs with probability αc between connected contacts.
 ## 3. Random background infection occurs with probability αr * nc * (βi * βj) /
