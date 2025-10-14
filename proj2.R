@@ -48,8 +48,8 @@ get.net <- function(beta, h, nc = 15) {
 ## nc is the average number of contacts per person
   n <- length(beta)  ## total number of individuals
   if (n < 2L) return(vector("list", n))  ## return empty list if less than 2 people
-  bbar <- mean(beta)  ## mean sociability (infectivity) parameter
-  cst <- nc / (bbar^2 * (n - 1))  ## constant factor for exact pairwise probability: Pr_ij = cst * β_i * β_j
+  beta_bar <- mean(beta)  ## mean sociability (infectivity) parameter
+  cst <- nc / (beta_bar^2 * (n - 1))  ## constant factor for exact pairwise probability: Pr_ij = cst * β_i * β_j
   alink <- vector("list", n)  ## initialize adjacency list
   
   H_ids <- unique(h)  ## unique household IDs
@@ -88,9 +88,6 @@ get.net <- function(beta, h, nc = 15) {
   return(alink) ## return adjacency list
 }
 
-#=========================================================
-# SEIR simulator with households and contact network
-#=========================================================
 nseir <- function(beta, h, alink, ## infection rates, household memberships, and regular contacts
                   alpha = c(0.1, 0.01, 0.01), ## infection (household, network, random)
                   delta = 0.2, ## daily probability of recovery
@@ -106,20 +103,20 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
 ## recovery probabilities (gamma, delta). It returns a list containing daily totals 
 ## of S, E, I, R, and the time vector t.
   
-  n <- length(beta)                                 # total number of individuals
-  stopifnot(length(h) == n, length(alink) == n)     # check vector lengths match
+  n <- length(beta) ## total number of individuals
+  stopifnot(length(h) == n, length(alink) == n) ## check the inputs, vector lengths match
   
-  bbar <- mean(beta)                                # mean infectivity
-  tvec <- seq_len(nt)                               # vector of time steps
+  beta_bar <- mean(beta) ## mean sociability
+  tvec <- seq_len(nt) ## vector of time steps
   
-  S_CODE <- 1L; E_CODE <- 2L; I_CODE <- 3L; R_CODE <- 4L # numeric codes for states
+  S_CODE <- 1L; E_CODE <- 2L; I_CODE <- 3L; R_CODE <- 4L ## numeric codes for states
   
-  state <- rep.int(S_CODE, n)                       # initialize all as susceptible
+  state <- rep.int(S_CODE, n) # initialize all as susceptible
   nI0 <- max(1L, round(pinf * n))                  # compute initial infected count
   initI <- sample.int(n, size = nI0, replace = FALSE) # randomly select initial infected
   state[initI] <- I_CODE                            # assign initial infections
   
-  H_ids <- unique(h)                                # unique household IDs
+  H_ids <- unique(h) ## unique household IDs
   HH <- vector("list", length(H_ids))              # initialize household membership list
   names(HH) <- as.character(H_ids)                # name elements by household ID
   for (hid in H_ids) HH[[as.character(hid)]] <- which(h == hid) # store household members
@@ -193,21 +190,17 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
   list(S = S_daily, E = E_daily, I = I_daily, R = R_daily, t = tvec) # return daily SEIR counts
 }
 
-
-# Plotting of SEIR trajectories
-# =======================================
-
 plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
   ## combines SEIR into a matrix and plot their trajectories over time.
   ## use different colors to represent each state and add a legend to distinguish the four lines.
-  stopifnot(all(c("S","E","I","R","t") %in% names(sim)))  # check that sim contains all required components
+  stopifnot(all(c("S","E","I","R","t") %in% names(sim))) # check that sim contains all required components
   mat <- cbind(S = sim$S, E = sim$E, I = sim$I, R = sim$R) # combine SEIR vectors into a single matrix for plotting
-  op <- par(mar = c(4.2, 4.5, 3.5, 1.2))                  # set plot margins for readability
-  on.exit(par(op))                                        # restore previous plot parameters when function exits
-  matplot(sim$t, mat, type = "l", lwd = 2,               # plot all four time series as lines
+  op <- par(mar = c(4.2, 4.5, 3.5, 1.2)) # set plot margins for readability
+  on.exit(par(op)) # restore previous plot parameters when function exits
+  matplot(sim$t, mat, type = "l", lwd = 2, # plot all four time series as lines
           xlab = "Day", ylab = "Population count", main = main, # set x and y labels and plot title
-          lty = 1)                                        # use solid line type for all series
-  legend("right", inset = 0.01, lwd = 2, col = 1:4, lty = 1, # add legend to the right side
+          lty = 1) # use solid line type for all series
+  legend("right", inset = 0.01, lwd = 2, col = 1:4, lty = 1, # add legends to the right side
          legend = c("S","E","I","R"), bg = "white", cex = 0.52) # specify legend labels, background, and font size
 }
 
