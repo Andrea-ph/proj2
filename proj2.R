@@ -94,17 +94,17 @@ get.net <- function(beta, h, nc = 15) {
 nseir <- function(beta, h, alink, ## infection rates, household memberships, and regular contacts
                   alpha = c(0.1, 0.01, 0.01), ## infection (household, network, random)
                   delta = 0.2, ## daily probability of recovery
-                  gamma = 0.4, ## daily probability of becoming infectious
-                  nc = 15, ## average number of contacts
-                  nt = 100, ## number of simulated days
-                  pinf = 0.005)# initial infection proportion 
+                  gamma = 0.4, ## daily probability of becoming infectious, incubation probability
+                  nc = 15, ## average number of contacts per person
+                  nt = 100, ## number of days
+                  pinf = 0.005)# proportion of the initial population to randomly start in the I state 
                   {
-  ## This function simulates an SEIR epidemic model with household, network and random. 
-  ## It tracks transitions between S, E, I, and R states over nt days for a population with given beta, h, and alink.
-  ## The model includes infection spread through household, network, and random contacts 
-  ## with respective strengths alpha, and accounts for daily infection, exposure, and 
-  ## recovery probabilities (gamma, delta). It returns a list containing daily totals 
-  ## of S, E, I, R, and the time vector t.
+## This function simulates an SEIR epidemic model with household, regular contact network and random mixing. 
+## It tracks transitions between S, E, I, and R states over nt days for a population with given beta, h, and alink.
+## The model includes infection spread through household, regular network, and random contacts 
+## with respective strengths alpha, and accounts for daily infection, exposure, and 
+## recovery probabilities (gamma, delta). It returns a list containing daily totals 
+## of S, E, I, R, and the time vector t.
   
   n <- length(beta)                                 # total number of individuals
   stopifnot(length(h) == n, length(alink) == n)     # check vector lengths match
