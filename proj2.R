@@ -136,10 +136,10 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
   
 for (tt in tvec) {
   # record current counts (counts at day start)
-  S_daily[tt] <- sum(state == S_CODE)
-  E_daily[tt] <- sum(state == E_CODE)
-  I_daily[tt] <- sum(state == I_CODE)
-  R_daily[tt] <- sum(state == R_CODE)
+  S_daily[tt] <- sum(state == S_CODE)  ## count susceptible individuals
+  E_daily[tt] <- sum(state == E_CODE)  ## count exposed individuals
+  I_daily[tt] <- sum(state == I_CODE)  ## count infectious individuals
+  R_daily[tt] <- sum(state == R_CODE)  ## count recovered individuals
   
   
   indS <- which(state == S_CODE) ## indices of susceptible individuals
@@ -147,95 +147,93 @@ for (tt in tvec) {
   indI <- which(state == I_CODE) ## indices of infectious individuals
   
   # ---------- Compute S -> E (infections) based on day-start infecteds ----------
-  if (length(indS) > 0 && length(indI) > 0) {
-    # Household component: number of infecteds in each household
-    I_tab <- table(h[indI])                          # counts infected per household (only households with infected appear)
-    # map infected counts to each susceptible's household (may produce NA where count is 0)
-    I_in_S_hh <- as.integer(I_tab[as.character(h[indS])])
-    I_in_S_hh[is.na(I_in_S_hh)] <- 0                  # replace NA (no infecteds in that hh) by 0
-    P_avoid_hh <- (1 - alpha[1]) ^ I_in_S_hh          # prob avoid infection from household infecteds
+  if (length(indS) > 0 && length(indI) > 0) {  ## only if there are both S and I individuals
+    I_tab <- table(h[indI])  ## count number of infecteds per household
+    I_in_S_hh <- as.integer(I_tab[as.character(h[indS])])  ## map infected count to susceptibles’ households
+    I_in_S_hh[is.na(I_in_S_hh)] <- 0  ## replace NA with 0 if no infected in that household
+    P_avoid_hh <- (1 - alpha[1]) ^ I_in_S_hh  ## probability of avoiding infection from household infecteds
     
-    # Network component: count infectious neighbors for each susceptible
-    inf_flag <- logical(n); inf_flag[indI] <- TRUE   # logical flag vector for quick membership tests
-    # get neighbor lists for susceptibles
-    neigh_lists <- alink[indS]
-    # count infected neighbors (vectorized with vapply for speed and consistency)
-    if (length(neigh_lists) > 0L) {
-      count_I_neigh <- vapply(neigh_lists, function(nb) {
-        if (length(nb) == 0L) return(0L)
-        sum(inf_flag[nb])
+    ## Network component: compute infections via regular contact network
+    inf_flag <- logical(n); inf_flag[indI] <- TRUE  ## logical flag vector marking currently infectious individuals
+    
+    ## extract each susceptible’s list of network contacts
+    network_lists <- alink[indS]  ## alink provides adjacency lists for all individuals
+    
+    ## count the number of infectious contacts for each susceptible individual
+    ## vapply is used instead of sapply to enforce integer output and ensure performance
+    if (length(network_lists) > 0L) {
+      count_I_network <- vapply(network_lists, function(net) {  ## iterate over each susceptible’s contact list
+        if (length(net) == 0L) return(0L)  ## if the person has no network contacts, count = 0
+        sum(inf_flag[net])  ## count how many of their contacts are infectious
       }, integer(1))
     } else {
-      count_I_neigh <- integer(0)
+      count_I_network <- integer(0)  ## if there are no susceptible individuals, create empty vector
     }
-    P_avoid_net <- (1 - alpha[2]) ^ count_I_neigh
     
-    # Random mixing component: approximate avoid prob using exponential approx
-    sum_beta_I <- sum(beta[indI])
+    P_avoid_network <- (1 - alpha[2]) ^ count_I_network  ## each infectious contact contributes multiplicatively to infection risk
+    
+    sum_beta_I <- sum(beta[indI]) ## total infectivity across all infecteds
     if (sum_beta_I == 0) {
-      P_avoid_rand <- rep(1, length(indS))           # no infectiousness => avoid prob = 1
+      P_avoid_rand <- rep(1, length(indS)) ## no infectiousness => avoid prob = 1
     } else {
       if (!exact_random) {
         # approximation: avoid probability = exp(- constant_mix * beta_j * sum_beta_I)
-        P_avoid_rand <- exp(- constant_mix * beta[indS] * sum_beta_I)
-        P_avoid_rand[P_avoid_rand < 0] <- 0
-        P_avoid_rand[P_avoid_rand > 1] <- 1
+        P_avoid_rand <- exp(- constant_mix * beta[indS] * sum_beta_I)  ## compute exponential approximation
+        P_avoid_rand[P_avoid_rand < 0] <- 0  ## ensure values are not below 0
+        P_avoid_rand[P_avoid_rand > 1] <- 1  ## ensure values are not above 1
       } else {
-        # exact product form (slow): prod_{i in I} (1 - p_ij)
-        P_avoid_rand <- numeric(length(indS))
-        for (k in seq_along(indS)) {
-          j <- indS[k]
-          pij <- constant_mix * beta[indI] * beta[j]
-          pij[pij > 1] <- 1
+        ## exact calculation: product over all infecteds
+        P_avoid_rand <- numeric(length(indS)) ## initialize vector
+        for (k in seq_along(indS)) {  ## loop through susceptibles
+          j <- indS[k]  ## index of the susceptible
+          pij <- constant_mix * beta[indI] * beta[j]  ## compute pairwise infection probabilities
+          pij[pij > 1] <- 1  ## cap probabilities at 1
           if (any(pij >= 1)) {
-            P_avoid_rand[k] <- 0
+            P_avoid_rand[k] <- 0  ## if any p_ij=1, infection is certain
           } else {
-            P_avoid_rand[k] <- exp(sum(log1p(-pij)))
+            P_avoid_rand[k] <- exp(sum(log1p(-pij)))  ## compute product of (1 - p_ij)
           }
         }
       }
     }
     
-    # combine avoidance probabilities (assume independence of sources)
-    P_avoid_all <- P_avoid_hh * P_avoid_net * P_avoid_rand
-    P_infect <- 1 - P_avoid_all
+    P_avoid_all <- P_avoid_hh * P_avoid_network * P_avoid_rand  ## combine independent avoidance probabilities
+    P_infect <- 1 - P_avoid_all  ## overall infection probability for each susceptible
     
     # perform Bernoulli draws for S->E
-    draws_SE <- runif(length(indS)) < P_infect
-    newE <- indS[draws_SE]                            # susceptibles becoming exposed today
+    draws_SE <- runif(length(indS)) < P_infect ## random draws for S→E transitions
+    newE <- indS[draws_SE] ## susceptibles becoming exposed today
   } else {
-    newE <- integer(0)                                # no new exposures if no S or no I
+    newE <- integer(0) ## no new exposures if no S or no I
   }
   
   # ---------- Compute E -> I (progression) ----------
-  if (length(indE) > 0) {
-    draws_EI <- runif(length(indE)) < gamma
-    newI_fromE <- indE[draws_EI]                      # exposed becoming infectious today
+  if (length(indE) > 0) { ## if there are any exposed individuals today
+    draws_EI <- runif(length(indE)) < gamma ## draw a random number to determine if they progress to infectious state
+    newI_fromE <- indE[draws_EI] ## select indices of exposed individuals who become infectious today
   } else {
-    newI_fromE <- integer(0)
+    newI_fromE <- integer(0) ## if no exposed individuals exist, no new infectious individuals will appear
   }
   
   # ---------- Compute I -> R (recoveries) ----------
-  if (length(indI) > 0) {
-    draws_IR <- runif(length(indI)) < delta
-    newR <- indI[draws_IR]                            # infectious recovering today
+  if (length(indI) > 0) { ## if there are any infectious individuals today
+    draws_IR <- runif(length(indI)) < delta ## draw a random number to determine if they recover today
+    newR <- indI[draws_IR] ## select indices of infectious individuals who recover today
   } else {
-    newR <- integer(0)
+    newR <- integer(0) ## if no infectious individuals exist, no new recoveries will occur
   }
   
   # ---------- Apply updates once (based on day-start indices) ----------
   # Important: updates are based on day-start sets so newly created categories do not act immediately
-  if (length(newE) > 0) state[newE] <- E_CODE
-  if (length(newI_fromE) > 0) state[newI_fromE] <- I_CODE
-  if (length(newR) > 0) state[newR] <- R_CODE
+  if (length(newE) > 0) state[newE] <- E_CODE ## update new exposures
+  if (length(newI_fromE) > 0) state[newI_fromE] <- I_CODE ## update new infecteds
+  if (length(newR) > 0) state[newR] <- R_CODE ## update new recoveries
   
-  # next day
+  # move to next day
 } # end days loop
 
-# return daily time series (counts at day starts)
-return(list(S = S_daily, E = E_daily, I = I_daily, R = R_daily, t = tvec))
+return(list(S = S_daily, E = E_daily, I = I_daily, R = R_daily, t = tvec))# return daily time series (counts at day starts)
 }
-
 plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
 ## combines SEIR into a matrix and plot their trajectories over time.
 ## use different colors to represent each state and add a legend to distinguish the four lines.
