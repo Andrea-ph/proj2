@@ -134,13 +134,11 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
   if (beta_bar <= 0) stop("mean(beta) must be positive")
   constant_mix <- alpha[3] * nc / (beta_bar^2 * (n - 1)) ## constant for random mixing
   
-for (tt in tvec) {
-  # record current counts (counts at day start)
+for (tt in tvec) { ## record current counts at day start
   S_daily[tt] <- sum(state == S_CODE)  ## count susceptible individuals
   E_daily[tt] <- sum(state == E_CODE)  ## count exposed individuals
   I_daily[tt] <- sum(state == I_CODE)  ## count infectious individuals
   R_daily[tt] <- sum(state == R_CODE)  ## count recovered individuals
-  
   
   indS <- which(state == S_CODE) ## indices of susceptible individuals
   indE <- which(state == E_CODE) ## indices of exposed individuals
