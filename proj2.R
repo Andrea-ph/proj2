@@ -249,15 +249,14 @@ plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
 run_four_scenarios <- function(n = 1000, nt = 100, hmax = 5, nc = 15,
                                alpha_full = c(0.1, 0.01, 0.01),
                                alpha_random_only = c(0, 0, 0.04),
-                               delta = 0.2, gamma = 0.4, pinf = 0.005,
-                               seed = 1) {
+                               delta = 0.2, gamma = 0.4, pinf = 0.005
+                              ) {
 ## Scenarios:
 ## A) Full model, beta ~ U(0,1)
 ## B) Random mixing only (alpha_h = alpha_c = 0, alpha_r = 0.04)
 ## C) Full model, constant beta = mean(beta)
 ## D) Random mixing + constant beta
 ## For fair comparison, use a single RNG seed at start, do not re-seed inside each simulation.
-  if (!is.null(seed)) set.seed(seed)  ## set random seed if provided for reproducibility
   
   betaA <- runif(n, 0, 1) ## generate n beta values uniformly between 0 and 1
   household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)
@@ -314,8 +313,7 @@ res <- run_four_scenarios(
   alpha_random_only = c(0, 0, 0.04),
   delta = 0.2,
   gamma = 0.4,
-  pinf = 0.005,
-  seed = NULL  ## already seeded above; leave NULL to avoid resetting inside
+  pinf = 0.005
 )
 
 ## Brief commentary:
