@@ -323,7 +323,7 @@ res <- run_four_scenarios(
 )
 
 ## Brief commentary:
-##  runs, scenarios with structured mixing (A, C) produce
-## - slightly later and/or lower peaks than pure random mixing (B, D),
-## - smaller final size when heterogeneity in beta is present (A vs C),
-## consistent with the notes: variability and clustering suppress spread.
+## By comparing Figure A and Figure B, when the household and regular contact network structure are removed, 
+##    random mixing leads to a faster and wider spread of infection, resulting in a higher short-term epidemic peak.
+## By comparing Figure A and Figure C, smaller final size when heterogeneity in beta is present,
+##    consistent with the notes -- variability and clustering suppress spread.
