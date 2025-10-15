@@ -49,7 +49,7 @@ get.net <- function(beta, h, nc = 15) {
   n <- length(beta)  ## total number of individuals
   if (n < 2L) return(vector("list", n))  ## return empty list if less than 2 people
   beta_bar <- mean(beta)  ## mean sociability (infectivity) parameter
-  cst <- nc / (beta_bar^2 * (n - 1))  ## constant factor for exact pairwise probability: Pr_ij = cst * β_i * β_j.Note: (n-1) because each person can link to n-1 others (excluding themselves)
+  constant_factor <- nc / (beta_bar^2 * (n - 1))  ## constant factor for exact pairwise probability: Pr_ij = cst * β_i * β_j.Note: (n-1) because each person can link to n-1 others (excluding themselves)
   alink <- vector("list", n)  ## initialize adjacency list
   
   H_ids <- unique(h)  ## unique household IDs
@@ -66,7 +66,7 @@ get.net <- function(beta, h, nc = 15) {
     js <- setdiff(js, hh_members)  ## exclude same household members 
     if (length(js) == 0) next  ## skip if no partners left
     
-    p <- cst * beta[i] * beta[js] ## compute link probabilities
+    p <- constant_factor * beta[i] * beta[js] ## compute link probabilities
     p[p < 0] <- 0  ## ensure probabilities >= 0
     p[p > 1] <- 1  ## ensure probabilities <= 1
     
@@ -74,9 +74,9 @@ get.net <- function(beta, h, nc = 15) {
     keep <- which(u < p)  ## keep edges where u < probability
     
     if (length(keep)) {  ## if any edges are kept
-      nbrs <- js[keep]   ## get connected neighbours indices for i
-      alink[[i]] <- c(alink[[i]], nbrs)  ## add neighbours to i's adjacency list
-      for (j in nbrs) alink[[j]] <- c(alink[[j]], i) ## symmetrically add i to each neighbor's adjacency list
+      neighbours <- js[keep]   ## get connected neighbours indices for i
+      alink[[i]] <- c(alink[[i]], neighbours)  ## add neighbours to i's adjacency list
+      for (j in neighbours) alink[[j]] <- c(alink[[j]], i) ## symmetrically add i to each neighbor's adjacency list
     }
   }
   
