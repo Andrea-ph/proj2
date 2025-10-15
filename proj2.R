@@ -35,17 +35,17 @@ n <- 1000  ## our code work with any population sizes, here we test and develop 
 
 h <- rep(  ## repeat household IDs
   seq_along(household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)),  
-  ## sample from an integer sequence ranging from 1 to hmax =5 to generate a vector 
-  ## representing the household sizes. Repeated selection is allowed in sampling 
-  ## to ensure the uniform distribution of household sizes.
+## sample from an integer sequence ranging from 1 to hmax =5 to generate a vector 
+## representing the household sizes. Repeated selection is allowed in sampling 
+## to ensure the uniform distribution of household sizes.
   household_sizes  ## repeat IDs according to household size
 )[1:n]  ## trim vector to length n
 
 get.net <- function(beta, h, nc = 15) {  
-  ## function to generate regular contact network
-  ## please note that people in the same household are excluded from such contacts. 
-  ## beta is the n vector of β_i value for each person
-  ## nc is the average number of contacts per person
+## function to generate regular contact network
+## please note that people in the same household are excluded from such contacts. 
+## beta is the n vector of β_i value for each person
+## nc is the average number of contacts per person
   n <- length(beta)  ## total number of individuals
   if (n < 2L) return(vector("list", n))  ## return empty list if less than 2 people
   beta_bar <- mean(beta)  ## mean sociability (infectivity) parameter
@@ -98,12 +98,12 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
                   seed = NULL, ## optional RNG seed for reproducibility
                   exact_random = FALSE ## if TRUE compute exact random-product (slower)
 ) {
-  ## This function simulates an SEIR epidemic model with household, regular contact network and random mixing. 
-  ## It tracks transitions between S, E, I, and R states over nt days for a population with given beta, h, and alink.
-  ## The model includes infection spread through household, regular network, and random contacts 
-  ## with respective strengths alpha, and accounts for daily infection, exposure, and 
-  ## recovery probabilities (gamma, delta). It returns a list containing daily totals 
-  ## of S, E, I, R, and the time vector t.
+## This function simulates an SEIR epidemic model with household, regular contact network and random mixing. 
+## It tracks transitions between S, E, I, and R states over nt days for a population with given beta, h, and alink.
+## The model includes infection spread through household, regular network, and random contacts 
+## with respective strengths alpha, and accounts for daily infection, exposure, and 
+## recovery probabilities (gamma, delta). It returns a list containing daily totals 
+## of S, E, I, R, and the time vector t.
   if (!is.null(seed)) set.seed(seed) ## set RNG seed if provided
   
   n <- length(beta) ## total number of individuals            
