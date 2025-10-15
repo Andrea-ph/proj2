@@ -233,8 +233,8 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
 }
 
 plot_nseir <- function(sim, main = "SEIR Simulation", n = NULL) {
-  ## Plot SEIR dynamics for a single simulation result.
-  ## Optionally display sample size n in the title.
+## Plot SEIR dynamics for a single simulation result.
+## Optionally display sample size n in the title.
   
   stopifnot(all(c("S","E","I","R","t") %in% names(sim)))  ## Ensure input has all SEIR components
   mat <- cbind(S = sim$S, E = sim$E, I = sim$I, R = sim$R)  ## Combine S, E, I, R into a single matrix for plotting
@@ -269,12 +269,12 @@ run_four_scenarios <- function(n = 1000, nt = 100, hmax = 5, nc = 15,
                                alpha_full = c(0.1, 0.01, 0.01),
                                alpha_random_only = c(0, 0, 0.04),
                                delta = 0.2, gamma = 0.4, pinf = 0.005) {
-  ## Compare four different epidemic dynamics setups.
-  ## A) Full model, β ~ U(0,1)
-  ## B) Random mixing only (αh = αc = 0, αr = 0.04)
-  ## C) Full model with constant β = mean(β)
-  ## D) Random mixing + constant β
-  ## Note: Random seed should be set before calling this function for reproducibility.
+## Compare four different epidemic dynamics setups.
+## A) Full model, β ~ U(0,1)
+## B) Random mixing only (αh = αc = 0, αr = 0.04)
+## C) Full model with constant β = mean(β)
+## D) Random mixing + constant β
+## Note: Random seed should be set before calling this function for reproducibility.
   
   betaA <- runif(n, 0, 1)  ## Generate n random transmission rates β uniformly distributed on [0,1]
   household_sizes <- sample(1:hmax, ceiling(n / mean(1:hmax)), replace = TRUE)  ## Random household sizes
