@@ -35,17 +35,17 @@ n <- 1000  ## our code work with any population sizes, here we test and develop 
 
 h <- rep(  ## repeat household IDs
   seq_along(household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)),  
-## sample from an integer sequence ranging from 1 to hmax =5 to generate a vector 
-## representing the household sizes. Repeated selection is allowed in sampling 
-## to ensure the uniform distribution of household sizes.
+  ## sample from an integer sequence ranging from 1 to hmax =5 to generate a vector 
+  ## representing the household sizes. Repeated selection is allowed in sampling 
+  ## to ensure the uniform distribution of household sizes.
   household_sizes  ## repeat IDs according to household size
 )[1:n]  ## trim vector to length n
 
 get.net <- function(beta, h, nc = 15) {  
-## function to generate regular contact network
-## please note that people in the same household are excluded from such contacts. 
-## beta is the n vector of β_i value for each person
-## nc is the average number of contacts per person
+  ## function to generate regular contact network
+  ## please note that people in the same household are excluded from such contacts. 
+  ## beta is the n vector of β_i value for each person
+  ## nc is the average number of contacts per person
   n <- length(beta)  ## total number of individuals
   if (n < 2L) return(vector("list", n))  ## return empty list if less than 2 people
   beta_bar <- mean(beta)  ## mean sociability (infectivity) parameter
@@ -89,21 +89,21 @@ get.net <- function(beta, h, nc = 15) {
 }
 
 nseir <- function(beta, h, alink, ## infection rates, household memberships, and regular contacts
-                 alpha = c(0.1, 0.01, 0.01), ## infection (household, network, random)
-                 delta = 0.2, ## daily probability of recovery
-                 gamma = 0.4, ## daily probability of becoming infectious, incubation probability
-                 nc = 15, ## average number of contacts per person
-                 nt = 100, ## number of days
-                 pinf = 0.005, ## proportion of the initial population to randomly start in the I state 
-                 seed = NULL, ## optional RNG seed for reproducibility
-                 exact_random = FALSE ## if TRUE compute exact random-product (slower)
+                  alpha = c(0.1, 0.01, 0.01), ## infection (household, network, random)
+                  delta = 0.2, ## daily probability of recovery
+                  gamma = 0.4, ## daily probability of becoming infectious, incubation probability
+                  nc = 15, ## average number of contacts per person
+                  nt = 100, ## number of days
+                  pinf = 0.005, ## proportion of the initial population to randomly start in the I state 
+                  seed = NULL, ## optional RNG seed for reproducibility
+                  exact_random = FALSE ## if TRUE compute exact random-product (slower)
 ) {
-## This function simulates an SEIR epidemic model with household, regular contact network and random mixing. 
-## It tracks transitions between S, E, I, and R states over nt days for a population with given beta, h, and alink.
-## The model includes infection spread through household, regular network, and random contacts 
-## with respective strengths alpha, and accounts for daily infection, exposure, and 
-## recovery probabilities (gamma, delta). It returns a list containing daily totals 
-## of S, E, I, R, and the time vector t.
+  ## This function simulates an SEIR epidemic model with household, regular contact network and random mixing. 
+  ## It tracks transitions between S, E, I, and R states over nt days for a population with given beta, h, and alink.
+  ## The model includes infection spread through household, regular network, and random contacts 
+  ## with respective strengths alpha, and accounts for daily infection, exposure, and 
+  ## recovery probabilities (gamma, delta). It returns a list containing daily totals 
+  ## of S, E, I, R, and the time vector t.
   if (!is.null(seed)) set.seed(seed) ## set RNG seed if provided
   
   n <- length(beta) ## total number of individuals            
@@ -134,187 +134,201 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
   if (beta_bar <= 0) stop("mean(beta) must be positive")
   constant_mix <- alpha[3] * nc / (beta_bar^2 * (n - 1)) ## constant for random mixing
   
-for (tt in tvec) { ## record current counts at day start
-  S_daily[tt] <- sum(state == S_CODE)  ## count susceptible individuals
-  E_daily[tt] <- sum(state == E_CODE)  ## count exposed individuals
-  I_daily[tt] <- sum(state == I_CODE)  ## count infectious individuals
-  R_daily[tt] <- sum(state == R_CODE)  ## count recovered individuals
-  
-  indS <- which(state == S_CODE) ## indices of susceptible individuals
-  indE <- which(state == E_CODE) ## indices of exposed individuals
-  indI <- which(state == I_CODE) ## indices of infectious individuals
-  
-  ## Compute S -> E based on day-start infected individuals
-  if (length(indS) > 0 && length(indI) > 0) {  ## only if there are both S and I individuals
-    I_tab <- table(h[indI])  ## count number of infectious individuals per household
-    I_in_S_hh <- as.integer(I_tab[as.character(h[indS])])  ## map infected count to susceptibles’ households
-    I_in_S_hh[is.na(I_in_S_hh)] <- 0  ## replace NA with 0 if no infected in that household
-    P_avoid_hh <- (1 - alpha[1]) ^ I_in_S_hh  ## probability of avoiding infection from household infected individuals
+  for (tt in tvec) { ## record current counts at day start
+    S_daily[tt] <- sum(state == S_CODE)  ## count susceptible individuals
+    E_daily[tt] <- sum(state == E_CODE)  ## count exposed individuals
+    I_daily[tt] <- sum(state == I_CODE)  ## count infectious individuals
+    R_daily[tt] <- sum(state == R_CODE)  ## count recovered individuals
     
-    ## Regular Contact Network
-    inf_flag <- logical(n); inf_flag[indI] <- TRUE  ## logical flag vector marking currently infectious individuals
+    indS <- which(state == S_CODE) ## indices of susceptible individuals
+    indE <- which(state == E_CODE) ## indices of exposed individuals
+    indI <- which(state == I_CODE) ## indices of infectious individuals
     
-    ## extract each susceptible’s list of network contacts
-    network_lists <- alink[indS]  ## alink provides adjacency lists for all individuals
-    
-    ## count the number of infectious contacts for each susceptible individual
-    ## vapply is used instead of sapply to enforce integer output and ensure performance
-    if (length(network_lists) > 0L) {
-      count_I_network <- vapply(network_lists, function(net) {  ## iterate over each susceptible’s contact list
-        if (length(net) == 0L) return(0L)  ## if the person has no network contacts, count = 0
-        sum(inf_flag[net])  ## count how many of their contacts are infectious
-      }, integer(1))
-    } else {
-      count_I_network <- integer(0)  ## if there are no susceptible individuals, create empty vector
-    }
-    
-    P_avoid_network <- (1 - alpha[2]) ^ count_I_network  ## each infectious contact contributes multiplicatively to infection risk
-    
-    sum_beta_I <- sum(beta[indI]) ## total infectivity across all infectious individuals
-    if (sum_beta_I == 0) {
-      P_avoid_rand <- rep(1, length(indS)) ## no infectiousness => avoid prob = 1
-    } else {
-      if (!exact_random) {
-        ## approximation: avoid probability = exp(- constant_mix * beta_j * sum_beta_I)
-        P_avoid_rand <- exp(- constant_mix * beta[indS] * sum_beta_I)  ## compute exponential approximation
-        P_avoid_rand[P_avoid_rand < 0] <- 0  ## ensure values are not below 0
-        P_avoid_rand[P_avoid_rand > 1] <- 1  ## ensure values are not above 1
+    ## Compute S -> E based on day-start infected individuals
+    if (length(indS) > 0 && length(indI) > 0) {  ## only if there are both S and I individuals
+      I_tab <- table(h[indI])  ## count number of infectious individuals per household
+      I_in_S_hh <- as.integer(I_tab[as.character(h[indS])])  ## map infected count to susceptibles’ households
+      I_in_S_hh[is.na(I_in_S_hh)] <- 0  ## replace NA with 0 if no infected in that household
+      P_avoid_hh <- (1 - alpha[1]) ^ I_in_S_hh  ## probability of avoiding infection from household infected individuals
+      
+      ## Regular Contact Network
+      inf_flag <- logical(n); inf_flag[indI] <- TRUE  ## logical flag vector marking currently infectious individuals
+      
+      ## extract each susceptible’s list of network contacts
+      network_lists <- alink[indS]  ## alink provides adjacency lists for all individuals
+      
+      ## count the number of infectious contacts for each susceptible individual
+      ## vapply is used instead of sapply to enforce integer output and ensure performance
+      if (length(network_lists) > 0L) {
+        count_I_network <- vapply(network_lists, function(net) {  ## iterate over each susceptible’s contact list
+          if (length(net) == 0L) return(0L)  ## if the person has no network contacts, count = 0
+          sum(inf_flag[net])  ## count how many of their contacts are infectious
+        }, integer(1))
       } else {
-        ## exact calculation: product over all infectious individuals
-        P_avoid_rand <- numeric(length(indS)) ## initialize vector
-        for (k in seq_along(indS)) {  ## loop through susceptibles
-          j <- indS[k]  ## index of the susceptible
-          pij <- constant_mix * beta[indI] * beta[j]  ## compute pairwise infection probabilities
-          pij[pij > 1] <- 1  ## cap probabilities at 1
-          if (any(pij >= 1)) {
-            P_avoid_rand[k] <- 0  ## if any p_ij=1, infection is certain
-          } else {
-            P_avoid_rand[k] <- exp(sum(log1p(-pij)))  ## compute product of (1 - p_ij)
+        count_I_network <- integer(0)  ## if there are no susceptible individuals, create empty vector
+      }
+      
+      P_avoid_network <- (1 - alpha[2]) ^ count_I_network  ## each infectious contact contributes multiplicatively to infection risk
+      
+      sum_beta_I <- sum(beta[indI]) ## total infectivity across all infectious individuals
+      if (sum_beta_I == 0) {
+        P_avoid_rand <- rep(1, length(indS)) ## no infectiousness => avoid prob = 1
+      } else {
+        if (!exact_random) {
+          ## approximation: avoid probability = exp(- constant_mix * beta_j * sum_beta_I)
+          P_avoid_rand <- exp(- constant_mix * beta[indS] * sum_beta_I)  ## compute exponential approximation
+          P_avoid_rand[P_avoid_rand < 0] <- 0  ## ensure values are not below 0
+          P_avoid_rand[P_avoid_rand > 1] <- 1  ## ensure values are not above 1
+        } else {
+          ## exact calculation: product over all infectious individuals
+          P_avoid_rand <- numeric(length(indS)) ## initialize vector
+          for (k in seq_along(indS)) {  ## loop through susceptibles
+            j <- indS[k]  ## index of the susceptible
+            pij <- constant_mix * beta[indI] * beta[j]  ## compute pairwise infection probabilities
+            pij[pij > 1] <- 1  ## cap probabilities at 1
+            if (any(pij >= 1)) {
+              P_avoid_rand[k] <- 0  ## if any p_ij=1, infection is certain
+            } else {
+              P_avoid_rand[k] <- exp(sum(log1p(-pij)))  ## compute product of (1 - p_ij)
+            }
           }
         }
       }
+      
+      P_avoid_all <- P_avoid_hh * P_avoid_network * P_avoid_rand  ## combine independent avoidance probabilities
+      P_infect <- 1 - P_avoid_all  ## overall infection probability for each susceptible
+      
+      ## perform Bernoulli draws for S->E
+      draws_SE <- runif(length(indS)) < P_infect ## random draws for S→E transitions
+      newE <- indS[draws_SE] ## susceptibles becoming exposed today
+    } else {
+      newE <- integer(0) ## no new exposures if no S or no I
     }
     
-    P_avoid_all <- P_avoid_hh * P_avoid_network * P_avoid_rand  ## combine independent avoidance probabilities
-    P_infect <- 1 - P_avoid_all  ## overall infection probability for each susceptible
+    ## Compute E -> I (progression)
+    if (length(indE) > 0) { ## if there are any exposed individuals today
+      draws_EI <- runif(length(indE)) < gamma ## draw a random number to determine if they progress to infectious state
+      newI_fromE <- indE[draws_EI] ## select indices of exposed individuals who become infectious today
+    } else {
+      newI_fromE <- integer(0) ## if no exposed individuals exist, no new infectious individuals will appear
+    }
     
-    ## perform Bernoulli draws for S->E
-    draws_SE <- runif(length(indS)) < P_infect ## random draws for S→E transitions
-    newE <- indS[draws_SE] ## susceptibles becoming exposed today
-  } else {
-    newE <- integer(0) ## no new exposures if no S or no I
-  }
+    ## Compute I -> R (recoveries)
+    if (length(indI) > 0) { ## if there are any infectious individuals today
+      draws_IR <- runif(length(indI)) < delta ## draw a random number to determine if they recover today
+      newR <- indI[draws_IR] ## select indices of infectious individuals who recover today
+    } else {
+      newR <- integer(0) ## if no infectious individuals exist, no new recoveries will occur
+    }
+    
+    ## Updates (based on day-start indices)
+    ## Please note that updates are based on day-start sets so newly created categories do not act immediately
+    if (length(newE) > 0) state[newE] <- E_CODE ## update new exposures
+    if (length(newI_fromE) > 0) state[newI_fromE] <- I_CODE ## update new infectious individuals
+    if (length(newR) > 0) state[newR] <- R_CODE ## update new recoveries
+    ## move to next day
+  } 
   
-  ## Compute E -> I (progression)
-  if (length(indE) > 0) { ## if there are any exposed individuals today
-    draws_EI <- runif(length(indE)) < gamma ## draw a random number to determine if they progress to infectious state
-    newI_fromE <- indE[draws_EI] ## select indices of exposed individuals who become infectious today
-  } else {
-    newI_fromE <- integer(0) ## if no exposed individuals exist, no new infectious individuals will appear
-  }
-  
-  ## Compute I -> R (recoveries)
-  if (length(indI) > 0) { ## if there are any infectious individuals today
-    draws_IR <- runif(length(indI)) < delta ## draw a random number to determine if they recover today
-    newR <- indI[draws_IR] ## select indices of infectious individuals who recover today
-  } else {
-    newR <- integer(0) ## if no infectious individuals exist, no new recoveries will occur
-  }
-  
-  ## Updates (based on day-start indices)
-  ## Please note that updates are based on day-start sets so newly created categories do not act immediately
-  if (length(newE) > 0) state[newE] <- E_CODE ## update new exposures
-  if (length(newI_fromE) > 0) state[newI_fromE] <- I_CODE ## update new infectious individuals
-  if (length(newR) > 0) state[newR] <- R_CODE ## update new recoveries
-  ## move to next day
-} 
-
-return(list(S = S_daily, E = E_daily, I = I_daily, R = R_daily, t = tvec)) ## return daily time series (counts at day starts)
+  return(list(S = S_daily, E = E_daily, I = I_daily, R = R_daily, t = tvec)) ## return daily time series (counts at day starts)
 }
 
-plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
-## combines SEIR into a matrix and plot their trajectories over time.
-## use different colors to represent each state and add a legend to distinguish the four lines.
-  stopifnot(all(c("S","E","I","R","t") %in% names(sim))) ## check that sim contains all required components
-  mat <- cbind(S = sim$S, E = sim$E, I = sim$I, R = sim$R) ## combine SEIR vectors into a single matrix for plotting
-  op <- par(mar = c(4.2, 4.5, 3.5, 1.2)) ## set plot margins for readability
-  on.exit(par(op)) ## restore previous plot parameters when function exits
-  matplot(sim$t, mat, type = "l", lwd = 2, ## plot all four time series as lines
-          xlab = "Day", ylab = "Population count", main = main, ## set x and y labels and plot title
-          lty = 1) ## use solid line type for all series
-  legend("right", inset = 0.01, lwd = 2, col = 1:4, lty = 1, ## add legends to the right side
-         legend = c("S","E","I","R"), bg = "white", cex = 0.52) ## specify legend labels, background, and font size
+plot_nseir <- function(sim, main = "SEIR Simulation", n = NULL) {
+  ## Plot SEIR dynamics for a single simulation result.
+  ## Optionally display sample size n in the title.
+  
+  stopifnot(all(c("S","E","I","R","t") %in% names(sim)))  ## Ensure input has all SEIR components
+  mat <- cbind(S = sim$S, E = sim$E, I = sim$I, R = sim$R)  ## Combine S, E, I, R into a single matrix for plotting
+  
+  op <- par(mar = c(4.2, 4.5, 3.5, 4.5))  ## Set plot margins (bottom, left, top, right)
+  on.exit(par(op))  ## Restore previous plotting parameters after execution
+  
+  cols <- c("blue", "orange", "red", "darkgreen")  ## Define colors for S, E, I, R curves
+  matplot(sim$t, mat, type = "l", lwd = 2, col = cols, lty = 1,  ## Draw all four trajectories
+          xlab = "Day", ylab = "Population count",  ## Label axes
+          main = if (!is.null(n)) paste0(main, " (n = ", n, ")") else main)  ## Add n to title if given
+  
+  legend("right", inset = 0.01, lwd = 2, col = cols, lty = 1,  ## Add legend to distinguish S/E/I/R
+         legend = c("S","E","I","R"), bg = "white", cex = 0.6)  ## Set legend style and font size
+  
+  peaks <- list(
+    E = c(x = sim$t[which.max(sim$E)], y = max(sim$E)),  ## Find peak time and value for Exposed
+    I = c(x = sim$t[which.max(sim$I)], y = max(sim$I)),  ## Find peak time and value for Infectious
+    S = c(x = sim$t[which.min(sim$S)], y = min(sim$S)),  ## Find minimum time and value for Susceptible
+    R = c(x = sim$t[which.max(sim$R)], y = max(sim$R))   ## Find maximum time and value for Recovered
+  )
+  
+  points(peaks$E["x"], peaks$E["y"], pch = 19, col = cols[2])  ## Mark E peak point
+  points(peaks$I["x"], peaks$I["y"], pch = 19, col = cols[3])  ## Mark I peak point
+  points(peaks$S["x"], peaks$S["y"], pch = 17, col = cols[1])  ## Mark S minimum point
+  points(peaks$R["x"], peaks$R["y"], pch = 17, col = cols[4])  ## Mark R maximum point
+  
+  return(peaks) ## Return coordinates for later analysis or printing
 }
 
 run_four_scenarios <- function(n = 1000, nt = 100, hmax = 5, nc = 15,
                                alpha_full = c(0.1, 0.01, 0.01),
                                alpha_random_only = c(0, 0, 0.04),
-                               delta = 0.2, gamma = 0.4, pinf = 0.005
-                              ) {
-## Scenarios:
-## A) Full model, beta ~ U(0,1)
-## B) Random mixing only (alpha_h = alpha_c = 0, alpha_r = 0.04)
-## C) Full model, constant beta = mean(beta)
-## D) Random mixing + constant beta
-## For fair comparison, use a single RNG seed at start, do not re-seed inside each simulation.
+                               delta = 0.2, gamma = 0.4, pinf = 0.005) {
+  ## Compare four different epidemic dynamics setups.
+  ## A) Full model, β ~ U(0,1)
+  ## B) Random mixing only (αh = αc = 0, αr = 0.04)
+  ## C) Full model with constant β = mean(β)
+  ## D) Random mixing + constant β
+  ## Note: Random seed should be set before calling this function for reproducibility.
   
-  betaA <- runif(n, 0, 1) ## generate n beta values uniformly between 0 and 1
-  household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)
-  h <- rep(seq_along(household_sizes), household_sizes)[1:n]
+  betaA <- runif(n, 0, 1)  ## Generate n random transmission rates β uniformly distributed on [0,1]
+  household_sizes <- sample(1:hmax, ceiling(n / mean(1:hmax)), replace = TRUE)  ## Random household sizes
+  h <- rep(seq_along(household_sizes), household_sizes)[1:n]  ## Assign individuals to households
+  alink <- get.net(betaA, nc = nc, h = h)  ## Generate contact network based on β and household structure
   
-  alink <- get.net(betaA, nc = nc, h = h) ## generate contact network using betaA and households
-  
-  simA <- nseir(betaA, h, alink, ## scenario A: full SEIR model
+  simA <- nseir(betaA, h, alink,
                 alpha = alpha_full, delta = delta, gamma = gamma,
-                nc = nc, nt = nt, pinf = pinf)
-  
-  simB <- nseir(betaA, h, alink, ## scenario B: random mixing only
+                nc = nc, nt = nt, pinf = pinf) ## Full SEIR model with heterogeneous β 
+
+  simB <- nseir(betaA, h, alink,
                 alpha = alpha_random_only, delta = delta, gamma = gamma,
-                nc = nc, nt = nt, pinf = pinf)
+                nc = nc, nt = nt, pinf = pinf) ## Random mixing only (no structured contacts)
   
-  betaC <- rep(mean(betaA), n) ## scenario C: constant beta equal to mean(betaA)
-  alinkC <- get.net(betaC, nc = nc, h = h) # generate new network using constant beta
+  betaC <- rep(mean(betaA), n)  ## Use constant β equal to mean of βA for scenarios C and D
+  alinkC <- get.net(betaC, nc = nc, h = h)  ## Generate new contact network with constant β
   
-  simC <- nseir(betaC, h, alinkC, ## scenario C: full SEIR with constant beta
+  simC <- nseir(betaC, h, alinkC,
                 alpha = alpha_full, delta = delta, gamma = gamma,
-                nc = nc, nt = nt, pinf = pinf)
+                nc = nc, nt = nt, pinf = pinf) ## Full SEIR with constant β
   
-  simD <- nseir(betaC, h, alinkC, ## scenario D: random mixing + constant beta
+  simD <- nseir(betaC, h, alinkC,
                 alpha = alpha_random_only, delta = delta, gamma = gamma,
-                nc = nc, nt = nt, pinf = pinf)
+                nc = nc, nt = nt, pinf = pinf)  ## Random mixing + constant β
   
-  mk_title <- function(lbl, sim) {
-    peakI <- max(sim$I) ## find maximum number of infectious individuals
-    finR  <- tail(sim$R, 1) ## find final number of recovered individuals
-    paste0(lbl, "\npeak I = ", peakI, ", final R = ", finR) ## compose title string
-  }
+  op <- par(mfrow = c(2, 2), mar = c(4.2, 4.5, 3.5, 4.5))  ## Set 2×2 plotting layout
+  on.exit(par(op), add = TRUE)  ## Ensure graphics layout is restored afterward
   
-  op <- par(mfrow = c(2, 2), mar = c(4.2, 4.5, 3.5, 1.2)) ## set 2x2 plot layout and margins
-  on.exit(par(op), add = TRUE)       ## restore original plotting parameters on exit
-  plot_nseir(simA, main = mk_title("A) Full model, beta ~ U(0,1)", simA)) ## plot scenario A
-  plot_nseir(simB, main = mk_title("B) Random mixing only (αh=αc=0, αr=0.04)", simB)) ## plot scenario B
-  plot_nseir(simC, main = mk_title("C) Full model, constant beta = mean(beta)", simC)) ## plot scenario C
-  plot_nseir(simD, main = mk_title("D) Random mixing + constant beta", simD)) ## plot scenario D
+  to_df <- function(peaks) round(as.data.frame(do.call(rbind, peaks)), 2)  ## Convert list to rounded data frame
   
-  invisible(list(A = simA, B = simB, C = simC, D = simD,  ## return results invisibly
-                 betaA = betaA, betaC = betaC, h = h,
-                 alinkA = alink, alinkC = alinkC))
+  cat("\n===== Scenario A: Full model, β ~ U(0,1) =====\n")  ## Print header
+  peaksA <- plot_nseir(simA, main = "A) Full model, β ~ U(0,1)", n = n)  ## Plot result
+  print(to_df(peaksA))  ## Print peak coordinates below plot
+  
+  cat("\n===== Scenario B: Random mixing only (αh=αc=0, αr=0.04) =====\n")  ## Print header
+  peaksB <- plot_nseir(simB, main = "B) Random mixing only", n = n)  ## Plot result
+  print(to_df(peaksB))  ## Print coordinates
+  
+  cat("\n===== Scenario C: Full model, constant β =====\n")  ## Print header
+  peaksC <- plot_nseir(simC, main = "C) Full model, constant β", n = n)  ## Plot result
+  print(to_df(peaksC))  ## Print coordinates
+
+  cat("\n===== Scenario D: Random mixing + constant β =====\n")  ## Print header
+  peaksD <- plot_nseir(simD, main = "D) Random mixing + constant β", n = n)  ## Plot result
+  print(to_df(peaksD))  ## Print coordinates
+  
+  invisible(list(A = simA, B = simB, C = simC, D = simD,
+                 peaks = list(A = peaksA, B = peaksB, C = peaksC, D = peaksD)))## Return all results and peak data invisibly
 }
 
-## Example: run the scenarios
-## Reproducible with a single seed at the start
-set.seed(42)
-res <- run_four_scenarios(
-  n = 1000,
-  nt = 100,
-  hmax = 5,
-  nc = 15,
-  alpha_full = c(0.1, 0.01, 0.01),
-  alpha_random_only = c(0, 0, 0.04),
-  delta = 0.2,
-  gamma = 0.4,
-  pinf = 0.005
-)
+
+
+set.seed(42)  ## Set a fixed random seed for reproducibility
+res <- run_four_scenarios()  ## Run the four simulation scenarios
 
 ## Brief commentary:
 ## By comparing Figure A and Figure B, when the household and regular contact network structure are removed, 
