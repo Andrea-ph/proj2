@@ -175,7 +175,7 @@ for (tt in tvec) { ## record current counts at day start
       P_avoid_rand <- rep(1, length(indS)) ## no infectiousness => avoid prob = 1
     } else {
       if (!exact_random) {
-        # approximation: avoid probability = exp(- constant_mix * beta_j * sum_beta_I)
+        ## approximation: avoid probability = exp(- constant_mix * beta_j * sum_beta_I)
         P_avoid_rand <- exp(- constant_mix * beta[indS] * sum_beta_I)  ## compute exponential approximation
         P_avoid_rand[P_avoid_rand < 0] <- 0  ## ensure values are not below 0
         P_avoid_rand[P_avoid_rand > 1] <- 1  ## ensure values are not above 1
@@ -198,7 +198,7 @@ for (tt in tvec) { ## record current counts at day start
     P_avoid_all <- P_avoid_hh * P_avoid_network * P_avoid_rand  ## combine independent avoidance probabilities
     P_infect <- 1 - P_avoid_all  ## overall infection probability for each susceptible
     
-    # perform Bernoulli draws for S->E
+    ## perform Bernoulli draws for S->E
     draws_SE <- runif(length(indS)) < P_infect ## random draws for S→E transitions
     newE <- indS[draws_SE] ## susceptibles becoming exposed today
   } else {
@@ -246,7 +246,7 @@ plot_nseir <- function(sim, main = "SEIR with Households & Contacts") {
          legend = c("S","E","I","R"), bg = "white", cex = 0.52) ## specify legend labels, background, and font size
 }
 
-run_four_scenarios <- function(n = 1000, nt = 150, hmax = 5, nc = 15,
+run_four_scenarios <- function(n = 1000, nt = 100, hmax = 5, nc = 15,
                                alpha_full = c(0.1, 0.01, 0.01),
                                alpha_random_only = c(0, 0, 0.04),
                                delta = 0.2, gamma = 0.4, pinf = 0.005,
@@ -259,35 +259,34 @@ run_four_scenarios <- function(n = 1000, nt = 150, hmax = 5, nc = 15,
 ## For fair comparison, use a single RNG seed at start, do not re-seed inside each simulation.
   if (!is.null(seed)) set.seed(seed)  ## set random seed if provided for reproducibility
   
-  betaA <- runif(n, 0, 1)             ## generate n beta values uniformly between 0 and 1
+  betaA <- runif(n, 0, 1) ## generate n beta values uniformly between 0 and 1
   household_sizes <- sample(1:hmax, ceiling(n/mean(1:hmax)), replace = TRUE)
   h <- rep(seq_along(household_sizes), household_sizes)[1:n]
   
-  alink <- get.net(betaA, nc = nc, h = h)   ## generate contact network using betaA and households
+  alink <- get.net(betaA, nc = nc, h = h) ## generate contact network using betaA and households
   
-  simA <- nseir(betaA, h, alink,        ## scenario A: full SEIR model
+  simA <- nseir(betaA, h, alink, ## scenario A: full SEIR model
                 alpha = alpha_full, delta = delta, gamma = gamma,
                 nc = nc, nt = nt, pinf = pinf)
   
-  simB <- nseir(betaA, h, alink,        ## scenario B: random mixing only
+  simB <- nseir(betaA, h, alink, ## scenario B: random mixing only
                 alpha = alpha_random_only, delta = delta, gamma = gamma,
                 nc = nc, nt = nt, pinf = pinf)
   
-  betaC <- rep(mean(betaA), n)          ## scenario C: constant beta equal to mean(betaA)
+  betaC <- rep(mean(betaA), n) ## scenario C: constant beta equal to mean(betaA)
   alinkC <- get.net(betaC, nc = nc, h = h) # generate new network using constant beta
   
-  simC <- nseir(betaC, h, alinkC,      ## scenario C: full SEIR with constant beta
+  simC <- nseir(betaC, h, alinkC, ## scenario C: full SEIR with constant beta
                 alpha = alpha_full, delta = delta, gamma = gamma,
                 nc = nc, nt = nt, pinf = pinf)
   
-  simD <- nseir(betaC, h, alinkC,      ## scenario D: random mixing + constant beta
+  simD <- nseir(betaC, h, alinkC, ## scenario D: random mixing + constant beta
                 alpha = alpha_random_only, delta = delta, gamma = gamma,
                 nc = nc, nt = nt, pinf = pinf)
   
   mk_title <- function(lbl, sim) {
-    # Helper function to create a compact title showing peak I and final R
-    peakI <- max(sim$I)                 ## find maximum number of infectious individuals
-    finR  <- tail(sim$R, 1)             ## find final number of recovered individuals
+    peakI <- max(sim$I) ## find maximum number of infectious individuals
+    finR  <- tail(sim$R, 1) ## find final number of recovered individuals
     paste0(lbl, "\npeak I = ", peakI, ", final R = ", finR) ## compose title string
   }
   
@@ -304,8 +303,7 @@ run_four_scenarios <- function(n = 1000, nt = 150, hmax = 5, nc = 15,
 }
 
 ## Example: run the scenarios
-## (Reproducible with a single seed at the start; no reseeding inside.)
-
+## Reproducible with a single seed at the start
 set.seed(42)
 res <- run_four_scenarios(
   n = 1000,
