@@ -3,9 +3,9 @@
 #### Group members as below ################################
 #### Shuo Li (s2795688), Zhe Zhu (s2841606), Antrea Filippou (s2766374)
 #### Contributions as below ################################
-#### Shuo Li: get.net; nseir (34%) ###
-#### Zhe Zhu: nseir; plot nseir (33%) ###
-#### Antrea Filippou: h; scenarios (33%) ###
+#### Shuo Li: get.net; nseir (34%) #########################
+#### Zhe Zhu: nseir; plot nseir (33%) ######################
+#### Antrea Filippou: h; scenarios (33%) ###################
 ############################################################
 
 ## Code to simulate epidemic dynamics using a social-structured SEIR model.
