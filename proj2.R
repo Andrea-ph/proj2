@@ -8,6 +8,9 @@
 #### Antrea Filippou: h; scenarios (33%) ###################
 ############################################################
 
+## GitHub Repository:
+## https://github.com/Andrea-ph/proj2
+
 ## Code to simulate epidemic dynamics using a social-structured SEIR model.
 ## The challenge is to extend the basic SEIR model by introducing 
 ## realistic social structures into how infections spread.
