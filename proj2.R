@@ -94,9 +94,8 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
                   gamma = 0.4, ## daily probability of becoming infectious, incubation probability
                   nc = 15, ## average number of contacts per person
                   nt = 100, ## number of days
-                  pinf = 0.005, ## proportion of the initial population to randomly start in the I state 
-                  exact_random = FALSE ## if TRUE compute exact random-product (slower)
-) {
+                  pinf = 0.005) ## proportion of the initial population to randomly start in the I state 
+{
 ## This function simulates an SEIR epidemic model with household, regular contact network and random mixing. 
 ## It tracks transitions between S, E, I, and R states over nt days for a population with given beta, h, and alink.
 ## The model includes infection spread through household, regular network, and random contacts 
@@ -172,31 +171,13 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
       if (sum_beta_I == 0) {
         P_avoid_rand <- rep(1, length(indS)) ## no infectiousness => avoid prob = 1
       } else {
-        if (!exact_random) {
-          ## approximation: avoid probability = exp(- constant_mix * beta_j * sum_beta_I)
           P_avoid_rand <- exp(- constant_mix * beta[indS] * sum_beta_I)  ## compute exponential approximation
           P_avoid_rand[P_avoid_rand < 0] <- 0  ## ensure values are not below 0
           P_avoid_rand[P_avoid_rand > 1] <- 1  ## ensure values are not above 1
-        } else {
-          ## exact calculation: product over all infectious individuals
-          P_avoid_rand <- numeric(length(indS)) ## initialize vector
-          for (k in seq_along(indS)) {  ## loop through susceptibles
-            j <- indS[k]  ## index of the susceptible
-            pij <- constant_mix * beta[indI] * beta[j]  ## compute pairwise infection probabilities
-            pij[pij > 1] <- 1  ## cap probabilities at 1
-            if (any(pij >= 1)) {
-              P_avoid_rand[k] <- 0  ## if any p_ij=1, infection is certain
-            } else {
-              P_avoid_rand[k] <- exp(sum(log1p(-pij)))  ## compute product of (1 - p_ij)
-            }
-          }
-        }
-      }
+        } 
       
       P_avoid_all <- P_avoid_hh * P_avoid_network * P_avoid_rand  ## combine independent avoidance probabilities
       P_infect <- 1 - P_avoid_all  ## overall infection probability for each susceptible
-      
-      ## perform Bernoulli draws for S->E
       draws_SE <- runif(length(indS)) < P_infect ## random draws for S→E transitions
       newE <- indS[draws_SE] ## susceptibles becoming exposed today
     } else {
