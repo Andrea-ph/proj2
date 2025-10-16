@@ -95,7 +95,6 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
                   nc = 15, ## average number of contacts per person
                   nt = 100, ## number of days
                   pinf = 0.005, ## proportion of the initial population to randomly start in the I state 
-                  seed = NULL, ## optional RNG seed for reproducibility
                   exact_random = FALSE ## if TRUE compute exact random-product (slower)
 ) {
 ## This function simulates an SEIR epidemic model with household, regular contact network and random mixing. 
@@ -104,7 +103,6 @@ nseir <- function(beta, h, alink, ## infection rates, household memberships, and
 ## with respective strengths alpha, and accounts for daily infection, exposure, and 
 ## recovery probabilities (gamma, delta). It returns a list containing daily totals 
 ## of S, E, I, R, and the time vector t.
-  if (!is.null(seed)) set.seed(seed) ## set RNG seed if provided
   
   n <- length(beta) ## total number of individuals            
   if (!is.numeric(beta) || n < 1) stop("beta must be a non-empty numeric vector")
