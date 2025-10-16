@@ -306,7 +306,7 @@ run_four_scenarios <- function(n = 1000, nt = 100, hmax = 5, nc = 15,
 
 
 
-set.seed(42)  ## Set a fixed random seed for reproducibility
+set.seed(123)  ## Set a fixed random seed for reproducibility
 res <- run_four_scenarios()  ## Run the four simulation scenarios
 
 ## Brief commentary:
